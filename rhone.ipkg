@@ -8,7 +8,6 @@ executable = runSF
 
 modules    = Rhone
            , Rhone.Event
-           , Rhone.SF
            , Rhone.Types
            , Rhone.Time
 
