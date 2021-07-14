@@ -23,7 +23,7 @@ addSucc ItIsSucc ItIsSucc = ItIsSucc
 ||| a strictly positive integer.
 |||
 ||| The semantics of an integral time span of course
-||| depends on the use case.
+||| depend on the use case and sampling rate.
 public export
 record TimeSpan where
   constructor MkTimeSpan
