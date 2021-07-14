@@ -7,6 +7,16 @@ module Rhone.Event
 public export
 data Event a = NoEvent | Ev a
 
+||| Like `maybe` for `Maybe` extracts a value from an `Event`.
+public export
+event : Lazy b -> Lazy (a -> b) -> Event a -> b
+event b f NoEvent = b
+event b f (Ev x)  = f x
+
+--------------------------------------------------------------------------------
+--          Immplementations
+--------------------------------------------------------------------------------
+
 public export
 Eq a => Eq (Event a) where
   NoEvent == NoEvent = True
