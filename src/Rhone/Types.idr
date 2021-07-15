@@ -1,7 +1,7 @@
 module Rhone.Types
 
-import Data.Nat
-import Data.Vect
+import public Data.Nat
+import public Data.Vect
 
 import Rhone.Event
 
@@ -319,4 +319,3 @@ mutual
   evalDec _ (Par {d1 = Cau} {d2 = _} _ _)   impossible
   evalDec _ (Fan {d1 = Dec} {d2 = Cau} _ _) impossible
   evalDec _ (Fan {d1 = Cau} {d2 = _} _ _)   impossible
-
