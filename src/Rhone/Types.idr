@@ -229,3 +229,94 @@ data SF :  (input  : SVDesc m)
          -> SF (as ++ cs) (bs ++ ds) d1
          -> SF ds cs Dec
          -> SF as bs d1
+
+--------------------------------------------------------------------------------
+--          Evaluation
+--------------------------------------------------------------------------------
+
+mutual
+  ||| Causal evaluation of a signal function after a given time delta
+  ||| and with the given input.
+  |||
+  ||| The resulting pair holds the new signal function to be
+  ||| used in the next evaluation step and the output of the
+  ||| current step.
+  eval : TimeSpan -> SVect i -> SF i o d -> (SF i o d, SVect o)
+  eval _ _ sf@(Const o) = (sf, o)
+
+  eval _ i sf@(Arr f) = (sf, f i)
+
+  eval t i (Prim st run) =
+    let (st2,o) = run t st i in (Prim st2 run, o)
+
+  eval t i (DPrim st run) =
+    let (f,o) = run t st in (DPrim (f i) run, o)
+
+  eval t i (Ser iToX xToO) =
+    let (sfIX,x) = eval t i iToX
+        (sfXO,o) = eval t x xToO
+     in (Ser sfIX sfXO, o)
+
+  eval t i (Par i1ToO1 i2ToO2) =
+    let (i1,i2)    = split i
+        (sfI1, o1) = eval t i1 i1ToO1
+        (sfI2, o2) = eval t i2 i2ToO2
+     in (Par sfI1 sfI2, o1 ++ o2)
+
+  eval t i (Fan iToO1 iToO2) =
+    let (sf1, o1) = eval t i iToO1
+        (sf2, o2) = eval t i iToO2
+     in (Fan sf1 sf2, o1 ++ o2)
+
+  eval t as (Loop ascs_to_bsds ds_to_cs) =
+    let (ds_to_sf, cs) = evalDec t ds_to_cs
+        (sf_ascs,bsds) = eval t (as ++ cs) ascs_to_bsds
+        (bs,ds)        = split bsds
+     in (Loop sf_ascs (ds_to_sf ds), bs)
+
+  ||| Decoupled evaluation of a (provably decoupled) signal
+  ||| function after the given time delta.
+  |||
+  ||| Note, that no input is passed to the signal function
+  ||| and still it is able to generate its output.
+  ||| In order to get the signal function of the next evaluation
+  ||| step, the input will be needed, however.
+  export
+  evalDec : TimeSpan -> SF i o Dec -> (SVect i -> SF i o Dec, SVect o)
+  evalDec _ sf@(Const o) = (const sf, o)
+
+  evalDec t (DPrim st run) =
+    let (f,o) = run t st in (\i => DPrim (f i) run, o)
+
+  evalDec t (Ser {d1 = Dec} {d2 = _}   iToX xToY) =
+    let (iToSf, x) = evalDec t iToX
+        (sfXO, o)  = eval t x xToY
+     in (\i => Ser (iToSf i) (sfXO), o)
+
+  evalDec t (Ser {d1 = Cau} {d2 = Dec} iToX xToY) =
+    let (xToSf, o) = evalDec t xToY
+     in (\i => let (sfIX,x) = eval t i iToX in Ser sfIX (xToSf x), o)
+
+  evalDec t (Par {d1 = Dec} {d2 = Dec} i1ToO1 i2ToO2) =
+    let (i1ToSF,o1) = evalDec t i1ToO1
+        (i2ToSF,o2) = evalDec t i2ToO2
+     in (\i => let (i1,i2) = split i in Par (i1ToSF i1) (i2ToSF i2), o1 ++ o2)
+
+  evalDec t (Fan {d1 = Dec} {d2 = Dec} iToO1 iToO2) =
+    let (iToSF1,o1) = evalDec t iToO1
+        (iToSF2,o2) = evalDec t iToO2
+     in (\i => Fan (iToSF1 i) (iToSF2 i), o1 ++ o2)
+
+  evalDec t (Loop ascs_to_bsds ds_to_cs) =
+    let (ascsToSf,bsds) = evalDec t ascs_to_bsds
+        (bs,ds)         = split bsds
+        (dsSf,cs)       = eval t ds ds_to_cs
+     in (\as => Loop (ascsToSf $ as ++ cs) dsSf, bs)
+
+  -- impossible cases
+  evalDec _ (Ser {d1 = Cau} {d2 = Cau} _ _) impossible
+  evalDec _ (Par {d1 = Dec} {d2 = Cau} _ _) impossible
+  evalDec _ (Par {d1 = Cau} {d2 = _} _ _)   impossible
+  evalDec _ (Fan {d1 = Dec} {d2 = Cau} _ _) impossible
+  evalDec _ (Fan {d1 = Cau} {d2 = _} _ _)   impossible
+
