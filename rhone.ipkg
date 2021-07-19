@@ -9,7 +9,6 @@ executable = runSF
 modules    = Data.VectorSpace
 
            , Rhone
-           , Rhone.Event
            , Rhone.EventS
            , Rhone.Types
            , Rhone.Time
