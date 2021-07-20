@@ -64,6 +64,56 @@ Sample (C x)   = x
 Sample (S x)   = x
 Sample (P x y) = (Sample x, Sample y)
 
+public export
+data Kind = KE | KC | KS
+
+--------------------------------------------------------------------------------
+--          Lifting Functions
+--------------------------------------------------------------------------------
+
+public export
+data Liftable : Kind -> SVDesc -> Type where
+  LE  : (x : Type) -> Liftable KE (E x)
+  LC  : (x : Type) -> Liftable KC (C x)
+  LS  : (x : Type) -> Liftable KS (S x)
+  PE  : (x : Type) -> Liftable k d -> Liftable KE (P (E x) d)
+  PS  : (x : Type) -> Liftable k d -> Liftable k (P (S x) d)
+  PCE : (x : Type) -> Liftable KE d -> Liftable KE (P (C x) d)
+  PCC : (x : Type) -> Liftable KC d -> Liftable KC (P (C x) d)
+  PCS : (x : Type) -> Liftable KS d -> Liftable KC (P (C x) d)
+
+public export
+Fun : Liftable k d -> Type -> Type
+Fun (LE x)    res = x -> res
+Fun (LC x)    res = x -> res
+Fun (LS x)    res = x -> res
+Fun (PE x y)  res = x -> Fun y res
+Fun (PS x y)  res = x -> Fun y res
+Fun (PCE x y) res = x -> Fun y res
+Fun (PCC x y) res = x -> Fun y res
+Fun (PCS x y) res = x -> Fun y res
+
+applyS : (l : Liftable KS d) -> Fun l t -> Sample d -> t
+applyS (LS _)   f v     = f v
+applyS (PS _ r) f (v,w) = applyS r (f v) w
+
+applyC : (l : Liftable KC d) -> Fun l t -> Sample d -> t
+applyC (LC  _)   f v      = f v
+applyC (PS  _ r) f (v, w) = applyC r (f v) w
+applyC (PCC _ r) f (v, w) = applyC r (f v) w
+applyC (PCS _ r) f (v, w) = applyS r (f v) w
+
+applyE : (l : Liftable k d) -> Fun l t -> Sample d -> Maybe t 
+applyE (LE _)    f v            = f <$> v
+applyE (LC _)    f v            = Just $ f v
+applyE (LS _)    f v            = Just $ f v
+applyE (PS _  r) f (v, w)       = applyE r (f v) w
+applyE (PCE _ r) f (v, w)       = applyE r (f v) w
+applyE (PCC _ r) f (v, w)       = applyE r (f v) w
+applyE (PCS _ r) f (v, w)       = applyE r (f v) w
+applyE (PE _  r) f (Nothing, w) = Nothing
+applyE (PE _  r) f (Just v,  w) = applyE r (f v) w
+
 --------------------------------------------------------------------------------
 --          Initialisation
 --------------------------------------------------------------------------------
@@ -78,8 +128,12 @@ data Initialization = Ini | Uni
 public export
 record Node (st : Type) (input : SVDesc) (output : SVDesc) where
   constructor MkNode
+  run   : TimeSpan -> st -> Sample input -> (st, Sample output)
   state : st
-  run   : TimeSpan -> Sample input -> st -> (st, Sample output)
+
+public export
+stepNode : TimeSpan -> Node st i o -> Sample i -> (Node st i o, Sample o)
+stepNode t (MkNode run st) i = let (st2,o) = run t st i in (MkNode run st2, o)
 
 ||| Function over signal vectors.
 |||
@@ -121,9 +175,9 @@ data SF_ :  (ini    : Initialization)
    Fan    : SF_ ini as bs  -> SF_ ini as cs -> SF_ ini as (P bs cs)
 
    ||| Primitive stateful uninitialized signal function.
-   UPrim   :  {0 st : Type}
-           -> (Sample i -> (Node st i o, Sample o))
-           -> SF_ Uni i o
+   UPrim  :  {0 st : Type}
+          -> (Sample i -> (Node st i o, Sample o))
+          -> SF_ Uni i o
 
    ||| Primitive stateful initialized signal function.
    IPrim   :  {0 st : Type} -> Node st i o -> SF_ Ini i o
@@ -132,55 +186,187 @@ data SF_ :  (ini    : Initialization)
            -> (e -> SF_ Uni i (P o $ E e))
            -> SF_ ini i o
 
+   Freezer :  SF_ ini i o -> SF_ ini i (P o . C $ SF_ Uni i o)
+
+public export
+SF : (input : SVDesc) -> (output : SVDesc) -> Type
+SF = SF_ Uni
+
+--------------------------------------------------------------------------------
+--          Routing Primitives
+--------------------------------------------------------------------------------
+
+infixr 1 >>>, ^>>, >>^
+infixr 3 ***, &&&
+
+public export %inline
+id : SF as as
+id = Id
+
+public export %inline
+fst : SF (P as bs) as
+fst = First
+
+public export %inline
+snd : SF (P as bs) bs
+snd = Second
+
+public export %inline
+(>>>) : SF as bs -> SF bs cs -> SF as cs
+(>>>) = Seq
+
+public export %inline
+(&&&) : SF as bs -> SF as cs -> SF as (P bs cs)
+(&&&) = Fan
+
+public export
+(***) : SF as cs -> SF bs ds -> SF (P as bs) (P cs ds) 
+x *** y = (fst >>> x) &&& (snd >>> y)
+
+public export %inline
+rswitch : SF as (P bs $ E e) -> (e -> SF as (P bs $ E e)) -> SF as bs
+rswitch = RSwitch
+
+public export %inline
+freeze : SF as bs -> SF as (P bs . C $ SF as bs)
+freeze = Freezer
+
+--------------------------------------------------------------------------------
+--          Utilities
+--------------------------------------------------------------------------------
+
+export
+mkSF :  (TimeSpan -> st -> Sample i -> (st, Sample o))
+     -> (Sample i -> (st, Sample o))
+     -> SF i o
+mkSF f g = UPrim $ mapFst (MkNode f) . g
+
+export
+mkSFSource : (TimeSpan -> st -> (st, Sample o)) -> st -> Sample o -> SF i o
+mkSFSource f st o = mkSF (\dt,s,_ => f dt s) (const (st,o))
+
+export
+mkSFTimeless : (st -> Sample i -> (st, Sample o)) -> st -> SF i o
+mkSFTimeless f s = mkSF (const f) (f s)
+
+export
+mkSFStateless : (Sample i -> Sample o) -> SF i o
+mkSFStateless = Arr
+
+export
+const : o -> SF i (S o)
+const = Const
+
+export
+never : SF i (E o)
+never = Const Nothing
+
+export
+now : SF i (E ())
+now = mkSFSource (\_,_ => ((),Nothing)) () (Just ())
+
+export
+notYet : SF (E a) (E a)
+notYet = mkSF (\_,_,v => ((),v)) (const ((),Nothing))
+
+export
+filterE : (a -> Bool) -> SF (E a) (E a)
+filterE f = Arr $ \case Just x  => if f x then Nothing else Just x
+                        Nothing => Nothing
+
+export
+hold : a -> SF (E a) (S a)
+hold v = mkSFTimeless (\s => dup . fromMaybe s) v
+
+export
+edge : SF (S Bool) (E ())
+edge = mkSFTimeless run True
+  where run : Bool -> Bool -> (Bool,Maybe ())
+        run True False = (False,Just ())
+        run _    b     = (b, Nothing)
+
+--------------------------------------------------------------------------------
+--          Lifting Functions
+--------------------------------------------------------------------------------
+
+export
+liftS : {auto l : Liftable KS i} -> Fun l o -> SF i (S o)
+liftS f = mkSFStateless (applyS l f)
+
+export
+liftC : {auto l : Liftable KC i} -> Fun l o -> SF i (C o)
+liftC f = mkSFStateless (applyC l f)
+
+export
+liftE : {auto l : Liftable KE i} -> Fun l o -> SF i (E o)
+liftE f = mkSFStateless (applyE l f)
 
 --------------------------------------------------------------------------------
 --          Evaluation
 --------------------------------------------------------------------------------
 
-mutual
-  step0 : SF_ Uni i o -> Sample i -> (SF_ Ini i o, Sample o)
-  step0 Id i          = (Id, i)
-  step0 First (x, _)  = (First, x)
-  step0 Second (_, y) = (Second, y)
-  step0 (Const x) _   = (Const x, x)
-  step0 (Arr f) i     = (Arr f, f i)
-  step0 (Seq ix xo) i = 
-    let (ix2,x) = step0 ix i
-        (xo2,o) = step0 xo x
-     in (Seq ix2 xo2, o)
+export
+step0 : SF_ Uni i o -> Sample i -> (SF_ Ini i o, Sample o)
+step0 Id i          = (Id, i)
+step0 First (x, _)  = (First, x)
+step0 Second (_, y) = (Second, y)
+step0 (Const x) _   = (Const x, x)
+step0 (Arr f) i     = (Arr f, f i)
+step0 (Seq ix xo) i = 
+  let (ix2,x) = step0 ix i
+      (xo2,o) = step0 xo x
+   in (Seq ix2 xo2, o)
 
-  step0 (Fan asbs ascs) as = 
-    let (asbs2,bs) = step0 asbs as
-        (ascs2,cs) = step0 ascs as
-     in (Fan asbs2 ascs2, (bs,cs))
+step0 (Fan asbs ascs) as = 
+  let (asbs2,bs) = step0 asbs as
+      (ascs2,cs) = step0 ascs as
+   in (Fan asbs2 ascs2, (bs,cs))
 
-  step0 (UPrim f) i = let (node,o) = f i in (IPrim node, o)
-  step0 (RSwitch sf f) i = case step0 sf i of
-    (sf2, (o, Nothing)) => (RSwitch sf2 f, o)
-    (_  , (o, Just e))  => let (sf2,(o,_)) = step0 (f e) i
-                            in (RSwitch sf2 f, o)
+step0 (UPrim f) i = let (node,o) = f i in (IPrim node, o)
+step0 (RSwitch sf f) i = case step0 sf i of
+  (sf2, (o, Nothing)) => (RSwitch sf2 f, o)
+  (_  , (o, Just e))  => let (sf2,(o,_)) = step0 (f e) i
+                          in (RSwitch sf2 f, o)
 
-  step : TimeSpan -> SF_ Ini i o -> Sample i -> (SF_ Ini i o, Sample o)
-  step _ Id i          = (Id, i)
-  step _ First (x, _)  = (First, x)
-  step _ Second (_, y) = (Second, y)
-  step _ (Const x) _   = (Const x, x)
-  step _ (Arr f) i     = (Arr f, f i)
-  step t (Seq ix xo) i = 
-    let (ix2,x) = step t ix i
-        (xo2,o) = step t xo x
-     in (Seq ix2 xo2, o)
+step0 (Freezer sf) i =
+  let (sf2,o) = step0 sf i
+   in (Freezer sf2, (o, sf))
 
-  step t (Fan asbs ascs) as = 
-    let (asbs2,bs) = step t asbs as
-        (ascs2,cs) = step t ascs as
-     in (Fan asbs2 ascs2, (bs,cs))
+export
+step : TimeSpan -> SF_ Ini i o -> Sample i -> (SF_ Ini i o, Sample o)
+step _ Id i          = (Id, i)
+step _ First (x, _)  = (First, x)
+step _ Second (_, y) = (Second, y)
+step _ (Const x) _   = (Const x, x)
+step _ (Arr f) i     = (Arr f, f i)
+step t (Seq ix xo) i = 
+  let (ix2,x) = step t ix i
+      (xo2,o) = step t xo x
+   in (Seq ix2 xo2, o)
 
-  step t (IPrim $ MkNode st run) i =
-    let (st2,o) = run t i st
-     in (IPrim $ MkNode st2 run, o)
+step t (Fan asbs ascs) as = 
+  let (asbs2,bs) = step t asbs as
+      (ascs2,cs) = step t ascs as
+   in (Fan asbs2 ascs2, (bs,cs))
 
-  step t (RSwitch sf f) i = case step t sf i of
-    (sf2, (o, Nothing)) => (RSwitch sf2 f, o)
-    (_  , (o, Just e))  => let (sf2,(o,_)) = step0 (f e) i
-                            in (RSwitch sf2 f, o)
+step t (IPrim n) i = let (n2,o) = stepNode t n i in (IPrim n2, o)
+
+step t (RSwitch sf f) i = case step t sf i of
+  (sf2, (o, Nothing)) => (RSwitch sf2 f, o)
+  (_  , (o, Just e))  => let (sf2,(o,_)) = step0 (f e) i
+                          in (RSwitch sf2 f, o)
+
+step t (Freezer sf) i =
+  let (sf2,o) = step t sf i
+   in (Freezer sf2, (o, freeze sf))
+  where freeze : SF_ Ini as bs -> SF_ Uni as bs
+        freeze Id            = Id
+        freeze First         = First
+        freeze Second        = Second
+        freeze (Const x)     = Const x
+        freeze (Arr f)       = Arr f
+        freeze (Seq x y)     = Seq (freeze x) (freeze y)
+        freeze (Fan x y)     = Fan (freeze x) (freeze y)
+        freeze (RSwitch x f) = RSwitch (freeze x) f
+        freeze (Freezer x)   = Freezer (freeze x)
+        freeze (IPrim n)     = UPrim (stepNode t n)
