@@ -1,5 +1,6 @@
 module Rhone.Types
 
+import public Data.Fuel
 import public Data.Nat
 import public Data.Vect
 
@@ -20,6 +21,16 @@ addSucc ItIsSucc ItIsSucc = ItIsSucc
 --          Time
 --------------------------------------------------------------------------------
 
+public export
+record Time where
+  constructor MkTime
+  value : Integer
+
+namespace Time
+  public export
+  fromInteger : (v : Integer) -> Time
+  fromInteger = MkTime
+
 ||| To avert rounding errors, we use integers
 ||| instead of floating point numbers for time. A time span is therefore
 ||| a strictly positive integer.
@@ -32,13 +43,22 @@ record TimeSpan where
   value    : Nat
   0 isSucc : IsSucc value
 
-public export
-fromInteger : (v : Integer) -> {auto 0 prf : IsSucc (fromInteger v)} -> TimeSpan
-fromInteger v = MkTimeSpan (fromInteger v) prf
+namespace TimeSpan
+  public export
+  fromInteger : (v : Integer) -> {auto 0 prf : IsSucc (fromInteger v)} -> TimeSpan
+  fromInteger v = MkTimeSpan (fromInteger v) prf
 
 public export
 Semigroup TimeSpan where
   (MkTimeSpan v1 s1 <+> MkTimeSpan v2 s2) = MkTimeSpan (v1 + v2) (addSucc s1 s2)
+
+public export
+timeSpan : Time -> Time -> Maybe TimeSpan
+timeSpan (MkTime a) (MkTime b) =
+  let n = integerToNat (b - a)
+   in case isItSucc n of
+        (Yes prf)   => Just $ MkTimeSpan n prf
+        (No contra) => Nothing
 
 --------------------------------------------------------------------------------
 --          Signal Vectors
@@ -174,6 +194,9 @@ data SF_ :  (ini    : Initialization)
    ||| Fanning out of signal functions
    Fan    : SF_ ini as bs  -> SF_ ini as cs -> SF_ ini as (P bs cs)
 
+   ||| Fanning out of signal functions
+   Par    : SF_ ini as cs  -> SF_ ini bs ds -> SF_ ini (P as bs) (P cs ds)
+
    ||| Primitive stateful uninitialized signal function.
    UPrim  :  {0 st : Type}
           -> (Sample i -> (Node st i o, Sample o))
@@ -219,9 +242,9 @@ public export %inline
 (&&&) : SF as bs -> SF as cs -> SF as (P bs cs)
 (&&&) = Fan
 
-public export
+public export %inline
 (***) : SF as cs -> SF bs ds -> SF (P as bs) (P cs ds) 
-x *** y = (fst >>> x) &&& (snd >>> y)
+(***) = Par
 
 public export %inline
 rswitch : SF as (P bs $ E e) -> (e -> SF as (P bs $ E e)) -> SF as bs
@@ -285,6 +308,15 @@ edge = mkSFTimeless run True
         run True False = (False,Just ())
         run _    b     = (b, Nothing)
 
+export
+when : (a -> Bool) -> SF (C a) (E a)
+when p = mkSFTimeless run True
+  where run : Bool -> a -> (Bool,Maybe a)
+        run True  y = (p y, Nothing)
+        run False y = 
+          let b = p y
+           in (b, if b then Just y else Nothing)
+
 --------------------------------------------------------------------------------
 --          Lifting Functions
 --------------------------------------------------------------------------------
@@ -322,6 +354,11 @@ step0 (Fan asbs ascs) as =
       (ascs2,cs) = step0 ascs as
    in (Fan asbs2 ascs2, (bs,cs))
 
+step0 (Par ascs bsds) (as,bs) = 
+  let (ascs2,cs) = step0 ascs as
+      (bsds2,ds) = step0 bsds bs
+   in (Par ascs2 bsds2, (cs,ds))
+
 step0 (UPrim f) i = let (node,o) = f i in (IPrim node, o)
 step0 (RSwitch sf f) i = case step0 sf i of
   (sf2, (o, Nothing)) => (RSwitch sf2 f, o)
@@ -349,6 +386,11 @@ step t (Fan asbs ascs) as =
       (ascs2,cs) = step t ascs as
    in (Fan asbs2 ascs2, (bs,cs))
 
+step t (Par ascs bsds) (as,bs) = 
+  let (ascs2,cs) = step t ascs as
+      (bsds2,ds) = step t bsds bs
+   in (Par ascs2 bsds2, (cs,ds))
+
 step t (IPrim n) i = let (n2,o) = stepNode t n i in (IPrim n2, o)
 
 step t (RSwitch sf f) i = case step t sf i of
@@ -367,6 +409,32 @@ step t (Freezer sf) i =
         freeze (Arr f)       = Arr f
         freeze (Seq x y)     = Seq (freeze x) (freeze y)
         freeze (Fan x y)     = Fan (freeze x) (freeze y)
+        freeze (Par x y)     = Par (freeze x) (freeze y)
         freeze (RSwitch x f) = RSwitch (freeze x) f
         freeze (Freezer x)   = Freezer (freeze x)
         freeze (IPrim n)     = UPrim (stepNode t n)
+
+--------------------------------------------------------------------------------
+--          Running Signal Functions
+--------------------------------------------------------------------------------
+
+export
+runSF :  SF i o
+      -> IO (Sample i)
+      -> (Sample o -> IO ())
+      -> IO Time
+      -> Fuel
+      -> IO ()
+runSF sf getI putO time fuel = do
+  (sf', o0) <- step0 sf <$> getI
+  putO o0
+  runSF' sf' 0 fuel
+  where runSF' : SF_ Ini i o -> Time -> Fuel -> IO ()
+        runSF' sf' t Dry      = pure ()
+        runSF' sf' t (More f) = do
+          t1 <- time
+          Just dt <- pure (timeSpan t1 t)
+            | Nothing => putStrLn "Time just went backwards"
+          (sf2, o2) <- step dt sf' <$> getI
+          putO o2
+          runSF' sf2 t1 f
