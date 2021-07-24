@@ -170,13 +170,14 @@ data Node : (input : SVDesc) -> (output : SVDesc) -> Causality -> Type where
         -> Node input output Cau
 
   DNode :  {0 st : Type}
-        -> (run : TimeSpan -> st -> Sample input -> (st, Sample output))
+        -> (run : TimeSpan -> st -> (Sample input -> st, Sample output))
         -> (state : st)
         -> Node input output Dec
 
 public export
-stepNode : TimeSpan -> Node i o Cau -> Sample i -> (Node i o Cau, Sample o)
+stepNode : TimeSpan -> Node i o c -> Sample i -> (Node i o c, Sample o)
 stepNode t (CNode run st) i = let (st2,o) = run t st i in (CNode run st2, o)
+stepNode t (DNode run st) i = let (f,o) = run t st in (DNode run (f i), o)
 
 ||| Function over signal vectors.
 |||
@@ -247,6 +248,8 @@ data SF_ :  (ini    : Initialization)
    Freezer :  SF_ ini i o cau -> SF_ ini i (P o . C $ SF_ Uni i o cau) cau
 
    Weaken : SF_ ini i o c -> SF_ ini i o Cau
+
+   Loop : SF_ ini (P as bs) (P cs ds) c -> SF_ ini ds bs Dec -> SF_ ini as cs c
 
 public export
 SF : (input : SVDesc) -> (output : SVDesc) -> Causality -> Type
@@ -375,155 +378,227 @@ SF = SF_ Uni
 --------------------------------------------------------------------------------
 
 weakenSwitch :  {c1,c2 : Causality}
-             -> SF_ Ini i o (c2 `and` c2)
-             -> SF_ Ini i o (c1 `and` c2)
+             -> SF_ ini i o (c2 `and` c2)
+             -> SF_ ini i o (c1 `and` c2)
 weakenSwitch {c1 = Dec} {c2 = Dec} sf = sf
 weakenSwitch {c1 = Dec} {c2 = Cau} sf = sf
 weakenSwitch {c1 = Cau} {c2 = _}   sf = Weaken sf
 
+freezeSF : TimeSpan -> SF_ Ini as bs c -> SF_ Uni as bs c
+freezeSF _ Id                     = Id
+freezeSF _ First                  = First
+freezeSF _ Second                 = Second
+freezeSF _ (Const x)              = Const x
+freezeSF _ (Arr f)                = Arr f
+freezeSF t (Seq c1 c2 x y)        = Seq c1 c2 (freezeSF t x) (freezeSF t y)
+freezeSF t (Fan c1 c2 x y)        = Fan c1 c2 (freezeSF t x) (freezeSF t y)
+freezeSF t (Par c1 c2 x y)        = Par c1 c2 (freezeSF t x) (freezeSF t y)
+freezeSF t (RSwitch c1 c2 x f)    = RSwitch c1 c2 (freezeSF t x) f
+freezeSF t (Freezer x)            = Freezer (freezeSF t x)
+freezeSF t (Weaken sf)            = Weaken $ freezeSF t sf
+freezeSF t (IPrim n@(CNode _ _))  = UCPrim (stepNode t n)
+freezeSF t (Loop sf feedback)     = Loop (freezeSF t sf) (freezeSF t feedback)
+freezeSF t (IPrim $ DNode run st) =
+  let (f,o) = run t st in UDPrim (DNode run . f) o
+
+mutual
+  export
+  step0 : SF_ Uni i o c -> Sample i -> (SF_ Ini i o c, Sample o)
+  step0 Id i          = (Id, i)
+  step0 (Weaken sf) i = let (sf2,o) = step0 sf i in (Weaken sf2, o)
+  step0 First (x, _)  = (First, x)
+  step0 Second (_, y) = (Second, y)
+  step0 (Const x) _   = (Const x, x)
+  step0 (Arr f) i     = (Arr f, f i)
+  step0 (Seq c1 c2 ix xo) i = 
+    let (ix2,x) = step0 ix i
+        (xo2,o) = step0 xo x
+     in (Seq c1 c2 ix2 xo2, o)
+
+  step0 (Fan c1 c2 asbs ascs) as = 
+    let (asbs2,bs) = step0 asbs as
+        (ascs2,cs) = step0 ascs as
+     in (Fan c1 c2 asbs2 ascs2, (bs,cs))
+
+  step0 (Par c1 c2 ascs bsds) (as,bs) = 
+    let (ascs2,cs) = step0 ascs as
+        (bsds2,ds) = step0 bsds bs
+     in (Par c1 c2 ascs2 bsds2, (cs,ds))
+
+  step0 (UCPrim f) i = let (node,o) = f i in (IPrim node, o)
+  step0 (UDPrim f o) i = (IPrim (f i), o)
+  step0 (RSwitch c1 c2 sf f) i = case step0 sf i of
+    (sf2, (o, Nothing)) => (RSwitch c1 c2 sf2 f, o)
+    (_  , (o, Just e))  => let (sf2,(o,_)) = step0 (f e) i
+                            in (weakenSwitch $ RSwitch c2 c2 sf2 f, o)
+
+  step0 (Freezer sf) i =
+    let (sf2,o) = step0 sf i
+     in (Freezer sf2, (o, sf))
+
+  step0 (Loop sf feedback) as =
+    let (ffb,bs)      = dstep0 feedback
+        (sf2,(cs,ds)) = step0 sf (as,bs)
+     in (Loop sf2 (ffb ds), cs)
+
+  export
+  dstep0 : SF_ Uni i o Dec -> (Sample i -> SF_ Ini i o Dec, Sample o)
+  dstep0 (Const v) = (\_ => Const v, v)
+  dstep0 (Seq Dec c2 isxs xsos) =
+    let (fisxs, xs) = dstep0 isxs
+        (sfxsos, os) = step0 xsos xs
+     in (\is => Seq Dec c2 (fisxs is) sfxsos, os)
+
+  dstep0 (Seq Cau Dec isxs xsos) =
+    let (fxsos, os) = dstep0 xsos
+     in (\is => let (sfisxs,xs) = step0 isxs is
+                 in Seq Cau Dec sfisxs (fxsos xs)
+        , os)
+
+  dstep0 (Fan Dec Dec asbs ascs) =
+    let (fasbs,bs) = dstep0 asbs
+        (fascs,cs) = dstep0 ascs
+     in (\as => Fan Dec Dec (fasbs as) (fascs as), (bs,cs))
+
+  dstep0 (Par Dec Dec ascs bsds) =
+    let (fascs,cs) = dstep0 ascs
+        (fbsds,ds) = dstep0 bsds
+     in (\(as,bs) => Par Dec Dec (fascs as) (fbsds bs), (cs,ds))
+
+  dstep0 (UDPrim f o) = (\i => IPrim (f i), o)
+
+  dstep0 (Freezer sf) =
+    let (f,o) = dstep0 sf
+     in (\x => Freezer (f x), (o, sf))
+
+  dstep0 (RSwitch Dec Dec sf f) = case dstep0 sf of
+    (mksf , (o, Nothing)) => (\i => RSwitch Dec Dec (mksf i) f, o)
+    (_ , (o, Just e))  => let (mksf,(o,_)) = dstep0 (f e)
+                           in (\i => RSwitch Dec Dec (mksf i) f, o)
+
+  dstep0 (Loop sf feedback) =
+    let (fsf,(cs,ds)) = dstep0 sf
+        (fb2,bs)      = step0 feedback ds
+     in (\as => Loop (fsf (as,bs)) fb2, cs)
+
+  dstep0 (Seq Cau Cau _ _) impossible
+  dstep0 (Fan Cau _ _ _) impossible
+  dstep0 (Fan Dec Cau _ _) impossible
+  dstep0 (Par Dec Cau _ _) impossible
+  dstep0 (Par Cau _ _ _) impossible
+  dstep0 (RSwitch Cau _ _ _) impossible
+  dstep0 (RSwitch Dec Cau _ _) impossible
+
+mutual
+  export
+  step : TimeSpan -> SF_ Ini i o c -> Sample i -> (SF_ Ini i o c, Sample o)
+  step _ Id i          = (Id, i)
+  step _ First (x, _)  = (First, x)
+  step _ Second (_, y) = (Second, y)
+  step _ (Const x) _   = (Const x, x)
+  step _ (Arr f) i     = (Arr f, f i)
+  step t (Seq c1 c2 ix xo) i = 
+    let (ix2,x) = step t ix i
+        (xo2,o) = step t xo x
+     in (Seq c1 c2 ix2 xo2, o)
+
+  step t (Fan c1 c2 asbs ascs) as = 
+    let (asbs2,bs) = step t asbs as
+        (ascs2,cs) = step t ascs as
+     in (Fan c1 c2 asbs2 ascs2, (bs,cs))
+
+  step t (Par c1 c2 ascs bsds) (as,bs) = 
+    let (ascs2,cs) = step t ascs as
+        (bsds2,ds) = step t bsds bs
+     in (Par c1 c2 ascs2 bsds2, (cs,ds))
+
+  step t (IPrim n) i = let (n2,o) = stepNode t n i in (IPrim n2, o)
+
+  step t (RSwitch c1 c2 sf f) i = case step t sf i of
+    (sf2, (o, Nothing)) => (RSwitch c1 c2 sf2 f, o)
+    (_  , (o, Just e))  => let (sf2,(o,_)) = step0 (f e) i
+                            in (weakenSwitch $ RSwitch c2 c2 sf2 f, o)
+
+  step t (Weaken sf) i = let (sf2,o) = step t sf i in (Weaken sf2, o)
+
+  step t (Freezer sf) i =
+    let (sf2,o) = step t sf i
+     in (Freezer sf2, (o, freezeSF t sf))
+
+  step t (Loop sf feedback) as = 
+    let (ffb, bs)      = dstep t feedback
+        (sf2, (cs,ds)) = step t sf (as,bs)
+     in (Loop sf2 (ffb ds), cs)
+
+  export
+  dstep : TimeSpan -> SF_ Ini i o Dec -> (Sample i -> SF_ Ini i o Dec, Sample o)
+  dstep _ (Const x)    = (\_ => Const x, x)
+  dstep t (Seq Dec c ix xo) = 
+    let (fix,x) = dstep t ix
+        (xo2,o) = step t xo x
+     in (\i => Seq Dec c (fix i) xo2, o)
+
+  dstep t (Seq Cau Dec ix xo) = 
+    let (fxo,o) = dstep t xo
+     in (\i => let (ix2,x) = step t ix i in Seq Cau Dec ix2 (fxo x), o)
+
+  dstep t (Fan Dec Dec asbs ascs) = 
+    let (fasbs,bs) = dstep t asbs
+        (fascs,cs) = dstep t ascs
+     in (\as => Fan Dec Dec (fasbs as) (fascs as), (bs,cs))
+
+  dstep t (Par Dec Dec ascs bsds) = 
+    let (fascs,cs) = dstep t ascs
+        (fbsds,ds) = dstep t bsds
+     in (\(as,bs) => Par Dec Dec (fascs as) (fbsds bs), (cs,ds))
+
+  dstep t (IPrim $ DNode run st) =
+    let (f,o) = run t st
+     in (IPrim . DNode run . f, o)
+
+  dstep t (RSwitch Dec Dec sf f) = case dstep t sf of
+    (fsf, (o, Nothing)) => (\i => RSwitch Dec Dec (fsf i) f, o)
+    (_  , (o, Just e))  => let (fsf,(o,_)) = dstep0 (f e)
+                            in (\i => RSwitch Dec Dec (fsf i) f, o)
+
+  dstep t (Freezer sf) =
+    let (fsf,o) = dstep t sf
+     in (\i => Freezer (fsf i), (o, freezeSF t sf))
+
+  dstep t (Loop sf feedback) =
+    let (fsf,(cs,ds)) = dstep t sf
+        (fb2,bs)      = step t feedback ds
+     in (\as => Loop (fsf (as,bs)) fb2, cs)
+
+  dstep _ (Seq Cau Cau _ _) impossible
+  dstep _ (Fan Cau _ _ _) impossible
+  dstep _ (Fan Dec Cau _ _) impossible
+  dstep _ (Par Dec Cau _ _) impossible
+  dstep _ (Par Cau _ _ _) impossible
+  dstep _ (RSwitch Cau _ _ _) impossible
+  dstep _ (RSwitch Dec Cau _ _) impossible
+
+--------------------------------------------------------------------------------
+--          Running Signal Functions
+--------------------------------------------------------------------------------
+
 export
-step0 : SF_ Uni i o c -> Sample i -> (SF_ Ini i o c, Sample o)
-step0 Id i          = (Id, i)
-step0 (Weaken sf) i = let (sf2,o) = step0 sf i in (Weaken sf2, o)
-step0 First (x, _)  = (First, x)
-step0 Second (_, y) = (Second, y)
-step0 (Const x) _   = (Const x, x)
-step0 (Arr f) i     = (Arr f, f i)
-step0 (Seq c1 c2 ix xo) i = 
-  let (ix2,x) = step0 ix i
-      (xo2,o) = step0 xo x
-   in (Seq c1 c2 ix2 xo2, o)
-
-step0 (Fan c1 c2 asbs ascs) as = 
-  let (asbs2,bs) = step0 asbs as
-      (ascs2,cs) = step0 ascs as
-   in (Fan c1 c2 asbs2 ascs2, (bs,cs))
-
-step0 (Par c1 c2 ascs bsds) (as,bs) = 
-  let (ascs2,cs) = step0 ascs as
-      (bsds2,ds) = step0 bsds bs
-   in (Par c1 c2 ascs2 bsds2, (cs,ds))
-
-step0 (UCPrim f) i = let (node,o) = f i in (IPrim node, o)
-step0 (UDPrim f o) i = (IPrim (f i), o)
-step0 (RSwitch c1 c2 sf f) i = case step0 sf i of
-  (sf2, (o, Nothing)) => (RSwitch c1 c2 sf2 f, o)
-  (_  , (o, Just e))  => let (sf2,(o,_)) = step0 (f e) i
-                          in (weakenSwitch $ RSwitch c2 c2 sf2 f, o)
-
-step0 (Freezer sf) i =
-  let (sf2,o) = step0 sf i
-   in (Freezer sf2, (o, sf))
-
-export
-dstep0 : SF_ Uni i o Dec -> (Sample i -> SF_ Ini i o Dec, Sample o)
-dstep0 (Const v) = (\_ => Const v, v)
-dstep0 (Seq Dec c2 isxs xsos) =
-  let (fisxs, xs) = dstep0 isxs
-      (sfxsos, os) = step0 xsos xs
-   in (\is => Seq Dec c2 (fisxs is) sfxsos, os)
-
-dstep0 (Seq Cau Dec isxs xsos) =
-  let (fxsos, os) = dstep0 xsos
-   in (\is => let (sfisxs,xs) = step0 isxs is
-               in Seq Cau Dec sfisxs (fxsos xs)
-      , os)
-
-dstep0 (Fan Dec Dec asbs ascs) =
-  let (fasbs,bs) = dstep0 asbs
-      (fascs,cs) = dstep0 ascs
-   in (\as => Fan Dec Dec (fasbs as) (fascs as), (bs,cs))
-
-dstep0 (Par Dec Dec ascs bsds) =
-  let (fascs,cs) = dstep0 ascs
-      (fbsds,ds) = dstep0 bsds
-   in (\(as,bs) => Par Dec Dec (fascs as) (fbsds bs), (cs,ds))
-
-dstep0 (UDPrim f o) = (\i => IPrim (f i), o)
-
-dstep0 (Freezer sf) =
-  let (f,o) = dstep0 sf
-   in (\x => Freezer (f x), (o, sf))
-
-dstep0 (RSwitch Dec Dec sf f) = case dstep0 sf of
-  (mksf , (o, Nothing)) => (\i => RSwitch Dec Dec (mksf i) f, o)
-  (_ , (o, Just e))  => let (mksf,(o,_)) = dstep0 (f e)
-                         in (\i => RSwitch Dec Dec (mksf i) f, o)
-
-dstep0 (Seq Cau Cau _ _) impossible
-dstep0 (Fan Cau _ _ _) impossible
-dstep0 (Fan Dec Cau _ _) impossible
-dstep0 (Par Dec Cau _ _) impossible
-dstep0 (Par Cau _ _ _) impossible
-dstep0 (RSwitch Cau _ _ _) impossible
-dstep0 (RSwitch Dec Cau _ _) impossible
-
--- export
--- step : TimeSpan -> SF_ Ini i o -> Sample i -> (SF_ Ini i o, Sample o)
--- step _ Id i          = (Id, i)
--- step _ First (x, _)  = (First, x)
--- step _ Second (_, y) = (Second, y)
--- step _ (Const x) _   = (Const x, x)
--- step _ (Arr f) i     = (Arr f, f i)
--- step t (Seq ix xo) i = 
---   let (ix2,x) = step t ix i
---       (xo2,o) = step t xo x
---    in (Seq ix2 xo2, o)
--- 
--- step t (Fan asbs ascs) as = 
---   let (asbs2,bs) = step t asbs as
---       (ascs2,cs) = step t ascs as
---    in (Fan asbs2 ascs2, (bs,cs))
--- 
--- step t (Par ascs bsds) (as,bs) = 
---   let (ascs2,cs) = step t ascs as
---       (bsds2,ds) = step t bsds bs
---    in (Par ascs2 bsds2, (cs,ds))
--- 
--- step t (IPrim n) i = let (n2,o) = stepNode t n i in (IPrim n2, o)
--- 
--- step t (RSwitch sf f) i = case step t sf i of
---   (sf2, (o, Nothing)) => (RSwitch sf2 f, o)
---   (_  , (o, Just e))  => let (sf2,(o,_)) = step0 (f e) i
---                           in (RSwitch sf2 f, o)
--- 
--- step t (Freezer sf) i =
---   let (sf2,o) = step t sf i
---    in (Freezer sf2, (o, freeze sf))
---   where freeze : SF_ Ini as bs -> SF_ Uni as bs
---         freeze Id            = Id
---         freeze First         = First
---         freeze Second        = Second
---         freeze (Const x)     = Const x
---         freeze (Arr f)       = Arr f
---         freeze (Seq x y)     = Seq (freeze x) (freeze y)
---         freeze (Fan x y)     = Fan (freeze x) (freeze y)
---         freeze (Par x y)     = Par (freeze x) (freeze y)
---         freeze (RSwitch x f) = RSwitch (freeze x) f
---         freeze (Freezer x)   = Freezer (freeze x)
---         freeze (IPrim n)     = UPrim (stepNode t n)
--- 
--- --------------------------------------------------------------------------------
--- --          Running Signal Functions
--- --------------------------------------------------------------------------------
--- 
--- export
--- runSF :  SF i o
---       -> IO (Sample i)
---       -> (Sample o -> IO ())
---       -> IO Time
---       -> Fuel
---       -> IO ()
--- runSF sf getI putO time fuel = do
---   (sf', o0) <- step0 sf <$> getI
---   putO o0
---   runSF' sf' 0 fuel
---   where runSF' : SF_ Ini i o -> Time -> Fuel -> IO ()
---         runSF' sf' t Dry      = pure ()
---         runSF' sf' t (More f) = do
---           t1 <- time
---           Just dt <- pure (timeSpan t1 t)
---             | Nothing => putStrLn "Time just went backwards"
---           (sf2, o2) <- step dt sf' <$> getI
---           putO o2
---           runSF' sf2 t1 f
+runSF :  SF i o c
+      -> IO (Sample i)
+      -> (Sample o -> IO ())
+      -> IO Time
+      -> Fuel
+      -> IO ()
+runSF sf getI putO time fuel = do
+  (sf', o0) <- step0 sf <$> getI
+  putO o0
+  runSF' sf' 0 fuel
+  where runSF' : SF_ Ini i o c -> Time -> Fuel -> IO ()
+        runSF' sf' t Dry      = pure ()
+        runSF' sf' t (More f) = do
+          t1 <- time
+          Just dt <- pure (timeSpan t1 t)
+            | Nothing => putStrLn "Time just went backwards"
+          (sf2, o2) <- step dt sf' <$> getI
+          putO o2
+          runSF' sf2 t1 f
