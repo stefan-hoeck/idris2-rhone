@@ -4,8 +4,6 @@ import public Data.Fuel
 import public Data.Nat
 import public Data.Vect
 
-import Rhone.Event
-
 %default total
 
 --------------------------------------------------------------------------------
@@ -32,7 +30,8 @@ namespace Time
   fromInteger = MkTime
 
 ||| To avert rounding errors, we use integers
-||| instead of floating point numbers for time. A time span is therefore
+||| instead of floating point numbers for time.
+||| A time span is therefore
 ||| a strictly positive integer.
 |||
 ||| The semantics of an integral time span of course
@@ -245,133 +244,40 @@ data SF_ :  (ini    : Initialization)
            -> (e -> SF_ Uni i (P o $ E e) c2)
            -> SF_ ini i o (c1 `and` c2)
 
-   Freezer :  SF_ ini i o cau -> SF_ ini i (P o . C $ SF_ Uni i o cau) cau
+   Freezer :  SF_ ini i o cau
+           -> SF_ ini i (P o . C $ SF_ Uni i o cau) cau
 
    Weaken : SF_ ini i o c -> SF_ ini i o Cau
 
-   Loop : SF_ ini (P as bs) (P cs ds) c -> SF_ ini ds bs Dec -> SF_ ini as cs c
+   Loop :  SF_ ini (P as bs) (P cs ds) c
+        -> SF_ ini ds bs Dec
+        -> SF_ ini as cs c
 
 public export
 SF : (input : SVDesc) -> (output : SVDesc) -> Causality -> Type
 SF = SF_ Uni
 
--- --------------------------------------------------------------------------------
--- --          Routing Primitives
--- --------------------------------------------------------------------------------
--- 
--- infixr 1 >>>, ^>>, >>^
--- infixr 3 ***, &&&
--- 
--- public export %inline
--- id : SF as as
--- id = Id
--- 
--- public export %inline
--- fst : SF (P as bs) as
--- fst = First
--- 
--- public export %inline
--- snd : SF (P as bs) bs
--- snd = Second
--- 
--- public export %inline
--- (>>>) : SF as bs -> SF bs cs -> SF as cs
--- (>>>) = Seq
--- 
--- public export %inline
--- (&&&) : SF as bs -> SF as cs -> SF as (P bs cs)
--- (&&&) = Fan
--- 
--- public export %inline
--- (***) : SF as cs -> SF bs ds -> SF (P as bs) (P cs ds) 
--- (***) = Par
--- 
--- public export %inline
--- rswitch : SF as (P bs $ E e) -> (e -> SF as (P bs $ E e)) -> SF as bs
--- rswitch = RSwitch
--- 
--- public export %inline
--- freeze : SF as bs -> SF as (P bs . C $ SF as bs)
--- freeze = Freezer
--- 
--- --------------------------------------------------------------------------------
--- --          Utilities
--- --------------------------------------------------------------------------------
--- 
--- export
--- mkSF :  (TimeSpan -> st -> Sample i -> (st, Sample o))
---      -> (Sample i -> (st, Sample o))
---      -> SF i o
--- mkSF f g = UPrim $ mapFst (MkNode f) . g
--- 
--- export
--- mkSFSource : (TimeSpan -> st -> (st, Sample o)) -> st -> Sample o -> SF i o
--- mkSFSource f st o = mkSF (\dt,s,_ => f dt s) (const (st,o))
--- 
--- export
--- mkSFTimeless : (st -> Sample i -> (st, Sample o)) -> st -> SF i o
--- mkSFTimeless f s = mkSF (const f) (f s)
--- 
--- export
--- mkSFStateless : (Sample i -> Sample o) -> SF i o
--- mkSFStateless = Arr
--- 
--- export
--- const : o -> SF i (S o)
--- const = Const
--- 
--- export
--- never : SF i (E o)
--- never = Const Nothing
--- 
--- export
--- now : SF i (E ())
--- now = mkSFSource (\_,_ => ((),Nothing)) () (Just ())
--- 
--- export
--- notYet : SF (E a) (E a)
--- notYet = mkSF (\_,_,v => ((),v)) (const ((),Nothing))
--- 
--- export
--- filterE : (a -> Bool) -> SF (E a) (E a)
--- filterE f = Arr $ \case Just x  => if f x then Nothing else Just x
---                         Nothing => Nothing
--- 
--- export
--- hold : a -> SF (E a) (S a)
--- hold v = mkSFTimeless (\s => dup . fromMaybe s) v
--- 
--- export
--- edge : SF (S Bool) (E ())
--- edge = mkSFTimeless run True
---   where run : Bool -> Bool -> (Bool,Maybe ())
---         run True False = (False,Just ())
---         run _    b     = (b, Nothing)
--- 
--- export
--- when : (a -> Bool) -> SF (C a) (E a)
--- when p = mkSFTimeless run True
---   where run : Bool -> a -> (Bool,Maybe a)
---         run True  y = (p y, Nothing)
---         run False y = 
---           let b = p y
---            in (b, if b then Just y else Nothing)
--- 
--- --------------------------------------------------------------------------------
--- --          Lifting Functions
--- --------------------------------------------------------------------------------
--- 
--- export
--- liftS : {auto l : Liftable KS i} -> Fun l o -> SF i (S o)
--- liftS f = mkSFStateless (applyS l f)
--- 
--- export
--- liftC : {auto l : Liftable KC i} -> Fun l o -> SF i (C o)
--- liftC f = mkSFStateless (applyC l f)
--- 
--- export
--- liftE : {auto l : Liftable KE i} -> Fun l o -> SF i (E o)
--- liftE f = mkSFStateless (applyE l f)
+--------------------------------------------------------------------------------
+--          Utilities
+--------------------------------------------------------------------------------
+
+export
+mkSF :  (TimeSpan -> st -> Sample i -> (st, Sample o))
+     -> (Sample i -> (st, Sample o))
+     -> SF i o Cau
+mkSF f g = UCPrim $ mapFst (CNode f) . g
+
+export
+mkSFSource : (TimeSpan -> st -> (st, Sample o)) -> st -> Sample o -> SF i o Cau
+mkSFSource f st o = mkSF (\dt,s,_ => f dt s) (const (st,o))
+
+export
+mkSFTimeless : (st -> Sample i -> (st, Sample o)) -> st -> SF i o Cau
+mkSFTimeless f s = mkSF (const f) (f s)
+
+export
+mkSFStateless : (Sample i -> Sample o) -> SF i o Cau
+mkSFStateless = Arr
 
 --------------------------------------------------------------------------------
 --          Evaluation
