@@ -83,56 +83,6 @@ Sample (C x)   = x
 Sample (S x)   = x
 Sample (P x y) = (Sample x, Sample y)
 
-public export
-data Kind = KE | KC | KS
-
---------------------------------------------------------------------------------
---          Lifting Functions
---------------------------------------------------------------------------------
-
-public export
-data Liftable : Kind -> SVDesc -> Type where
-  LE  : (x : Type) -> Liftable KE (E x)
-  LC  : (x : Type) -> Liftable KC (C x)
-  LS  : (x : Type) -> Liftable KS (S x)
-  PE  : (x : Type) -> Liftable k d -> Liftable KE (P (E x) d)
-  PS  : (x : Type) -> Liftable k d -> Liftable k (P (S x) d)
-  PCE : (x : Type) -> Liftable KE d -> Liftable KE (P (C x) d)
-  PCC : (x : Type) -> Liftable KC d -> Liftable KC (P (C x) d)
-  PCS : (x : Type) -> Liftable KS d -> Liftable KC (P (C x) d)
-
-public export
-Fun : Liftable k d -> Type -> Type
-Fun (LE x)    res = x -> res
-Fun (LC x)    res = x -> res
-Fun (LS x)    res = x -> res
-Fun (PE x y)  res = x -> Fun y res
-Fun (PS x y)  res = x -> Fun y res
-Fun (PCE x y) res = x -> Fun y res
-Fun (PCC x y) res = x -> Fun y res
-Fun (PCS x y) res = x -> Fun y res
-
-applyS : (l : Liftable KS d) -> Fun l t -> Sample d -> t
-applyS (LS _)   f v     = f v
-applyS (PS _ r) f (v,w) = applyS r (f v) w
-
-applyC : (l : Liftable KC d) -> Fun l t -> Sample d -> t
-applyC (LC  _)   f v      = f v
-applyC (PS  _ r) f (v, w) = applyC r (f v) w
-applyC (PCC _ r) f (v, w) = applyC r (f v) w
-applyC (PCS _ r) f (v, w) = applyS r (f v) w
-
-applyE : (l : Liftable k d) -> Fun l t -> Sample d -> Maybe t 
-applyE (LE _)    f v            = f <$> v
-applyE (LC _)    f v            = Just $ f v
-applyE (LS _)    f v            = Just $ f v
-applyE (PS _  r) f (v, w)       = applyE r (f v) w
-applyE (PCE _ r) f (v, w)       = applyE r (f v) w
-applyE (PCC _ r) f (v, w)       = applyE r (f v) w
-applyE (PCS _ r) f (v, w)       = applyE r (f v) w
-applyE (PE _  r) f (Nothing, w) = Nothing
-applyE (PE _  r) f (Just v,  w) = applyE r (f v) w
-
 --------------------------------------------------------------------------------
 --          Initialisation
 --------------------------------------------------------------------------------
@@ -156,6 +106,11 @@ public export
 and : Causality -> Causality -> Causality
 and Dec c = c
 and Cau _ = Cau
+
+public export
+OrCau : (c : Causality) -> c = or c Cau
+OrCau Cau = Refl
+OrCau Dec = Refl
 
 --------------------------------------------------------------------------------
 --          Signal Functions
@@ -199,12 +154,6 @@ data SF_ :  (ini    : Initialization)
 
    ||| The identity signal function
    Id     : SF_ ini i i Cau
-
-   ||| The identity signal function
-   First  : SF_ ini (P as bs) as Cau
-
-   ||| The identity signal function
-   Second : SF_ ini (P as bs) bs Cau
 
    ||| The constant signal function.
    Const  : Sample o -> SF_ ini i o Dec
@@ -292,8 +241,6 @@ weakenSwitch {c1 = Cau} {c2 = _}   sf = Weaken sf
 
 freezeSF : TimeSpan -> SF_ Ini as bs c -> SF_ Uni as bs c
 freezeSF _ Id                     = Id
-freezeSF _ First                  = First
-freezeSF _ Second                 = Second
 freezeSF _ (Const x)              = Const x
 freezeSF _ (Arr f)                = Arr f
 freezeSF t (Seq c1 c2 x y)        = Seq c1 c2 (freezeSF t x) (freezeSF t y)
@@ -312,8 +259,6 @@ mutual
   step0 : SF_ Uni i o c -> Sample i -> (SF_ Ini i o c, Sample o)
   step0 Id i          = (Id, i)
   step0 (Weaken sf) i = let (sf2,o) = step0 sf i in (Weaken sf2, o)
-  step0 First (x, _)  = (First, x)
-  step0 Second (_, y) = (Second, y)
   step0 (Const x) _   = (Const x, x)
   step0 (Arr f) i     = (Arr f, f i)
   step0 (Seq c1 c2 ix xo) i = 
@@ -399,8 +344,6 @@ mutual
   export
   step : TimeSpan -> SF_ Ini i o c -> Sample i -> (SF_ Ini i o c, Sample o)
   step _ Id i          = (Id, i)
-  step _ First (x, _)  = (First, x)
-  step _ Second (_, y) = (Second, y)
   step _ (Const x) _   = (Const x, x)
   step _ (Arr f) i     = (Arr f, f i)
   step t (Seq c1 c2 ix xo) i = 
