@@ -76,19 +76,19 @@ data Kind = KE | KC | KS
 |||       signal have kind `KS
 public export
 data Liftable : Kind -> SVDesc -> Type where
-  LE  : (x : Type) -> Liftable KE (E x)
-  LC  : (x : Type) -> Liftable KC (C x)
-  LS  : (x : Type) -> Liftable KS (S x)
-  PE  : (x : Type) -> Liftable k d -> Liftable KE (P (E x) d)
-  PS  : (x : Type) -> Liftable k d -> Liftable k (P (S x) d)
-  PCE : (x : Type) -> Liftable KE d -> Liftable KE (P (C x) d)
-  PCC : (x : Type) -> Liftable KC d -> Liftable KC (P (C x) d)
-  PCS : (x : Type) -> Liftable KS d -> Liftable KC (P (C x) d)
+  LE  : (0 x : Type) -> Liftable KE (E x)
+  LC  : (0 x : Type) -> Liftable KC (C x)
+  LS  : (0 x : Type) -> Liftable KS (S x)
+  PE  : (0 x : Type) -> Liftable k d -> Liftable KE (P (E x) d)
+  PS  : (0 x : Type) -> Liftable k d -> Liftable k (P (S x) d)
+  PCE : (0 x : Type) -> Liftable KE d -> Liftable KE (P (C x) d)
+  PCC : (0 x : Type) -> Liftable KC d -> Liftable KC (P (C x) d)
+  PCS : (0 x : Type) -> Liftable KS d -> Liftable KC (P (C x) d)
 
 ||| Calculate the type of an n-ary function with the given
 ||| return type from a `Liftable k d`.
 public export
-Fun : Liftable k d -> Type -> Type
+0 Fun : Liftable k d -> Type -> Type
 Fun (LE x)    res = x -> res
 Fun (LC x)    res = x -> res
 Fun (LS x)    res = x -> res
@@ -122,17 +122,17 @@ applyE (PE _  r) f (Just v,  w) = applyE r (f v) w
 ||| Lift an n-ary function over a tuple of
 ||| step signals.
 export
-liftS : {l : Liftable KS d} -> Fun l t -> SF d (S t) Cau
+liftS : {auto l : Liftable KS d} -> Fun l t -> SF d (S t) Cau
 liftS f = mkSFStateless (applyS l f)
 
 ||| Lift an n-ary function over a tuple of non-event signals,
 ||| of which at least one is continuous.
 export
-liftC : {l : Liftable KC d} -> Fun l t -> SF d (C t) Cau
+liftC : {auto l : Liftable KC d} -> Fun l t -> SF d (C t) Cau
 liftC f = mkSFStateless (applyC l f)
 
 ||| Lift an n-ary function over a tuple of signals,
 ||| of which at least one is an event.
 export
-liftE : {l : Liftable KE d} -> Fun l t -> SF d (E t) Cau
+liftE : {auto l : Liftable KE d} -> Fun l t -> SF d (E t) Cau
 liftE f = mkSFStateless (applyE l f)

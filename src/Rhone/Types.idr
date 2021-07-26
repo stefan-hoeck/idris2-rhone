@@ -29,6 +29,26 @@ namespace Time
   fromInteger : (v : Integer) -> Time
   fromInteger = MkTime
 
+public export
+Eq Time where
+  (==) = (==) `on` value
+
+public export
+Ord Time where
+  compare = compare `on` value
+
+export
+Show Time where
+  show = show . value
+
+public export
+Semigroup Time where
+  (MkTime v1 <+> MkTime v2) = MkTime (v1 + v2)
+
+public export
+Monoid Time where
+  neutral = 0
+
 ||| To avert rounding errors, we use integers
 ||| instead of floating point numbers for time.
 ||| A time span is therefore
@@ -48,6 +68,18 @@ namespace TimeSpan
   fromInteger v = MkTimeSpan (fromInteger v) prf
 
 public export
+Eq TimeSpan where
+  (==) = (==) `on` value
+
+public export
+Ord TimeSpan where
+  compare = compare `on` value
+
+export
+Show TimeSpan where
+  show = show . value
+
+public export
 Semigroup TimeSpan where
   (MkTimeSpan v1 s1 <+> MkTimeSpan v2 s2) = MkTimeSpan (v1 + v2) (addSucc s1 s2)
 
@@ -58,6 +90,16 @@ timeSpan (MkTime a) (MkTime b) =
    in case isItSucc n of
         (Yes prf)   => Just $ MkTimeSpan n prf
         (No contra) => Nothing
+
+public export
+minus : TimeSpan -> TimeSpan -> Maybe TimeSpan
+minus t1 t2 = case t1.value `minus` t2.value of
+                Z       => Nothing
+                k@(S _) => Just $ MkTimeSpan k ItIsSucc
+
+public export
+after : Time -> TimeSpan -> Time
+after t dt = MkTime $ t.value + natToInteger dt.value
 
 --------------------------------------------------------------------------------
 --          Signal Vectors
@@ -227,6 +269,12 @@ mkSFTimeless f s = mkSF (const f) (f s)
 export
 mkSFStateless : (Sample i -> Sample o) -> SF i o Cau
 mkSFStateless = Arr
+
+export
+mkSFDec :  (TimeSpan -> st -> (Sample i -> st, Sample o))
+        -> (Sample i -> st, Sample o)
+        -> SF i o Dec
+mkSFDec f (g,o) = UDPrim (DNode f . g)  o
 
 --------------------------------------------------------------------------------
 --          Evaluation
