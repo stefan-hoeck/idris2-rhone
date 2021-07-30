@@ -154,6 +154,11 @@ OrCau : (c : Causality) -> c = or c Cau
 OrCau Cau = Refl
 OrCau Dec = Refl
 
+public export
+AndDec : (c : Causality) -> c = and c Dec
+AndDec Cau = Refl
+AndDec Dec = Refl
+
 --------------------------------------------------------------------------------
 --          Signal Functions
 --------------------------------------------------------------------------------
@@ -275,6 +280,12 @@ mkSFDec :  (TimeSpan -> st -> (Sample i -> st, Sample o))
         -> (Sample i -> st, Sample o)
         -> SF i o Dec
 mkSFDec f (g,o) = UDPrim (DNode f . g)  o
+
+export
+mkSFDecTimeless :  (st -> (Sample i -> st, Sample o))
+                -> (ini : st)
+                -> SF i o Dec
+mkSFDecTimeless f ini = mkSFDec (\_ => f) (f ini)
 
 --------------------------------------------------------------------------------
 --          Evaluation

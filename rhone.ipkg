@@ -11,6 +11,8 @@ modules    = Data.VectorSpace
            , Rhone
            , Rhone.Basic
            , Rhone.Event
+           , Rhone.Scan
+           , Rhone.Switch
            , Rhone.Types
            , Rhone.Time
 

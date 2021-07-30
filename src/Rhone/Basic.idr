@@ -3,6 +3,7 @@ module Rhone.Basic
 import Rhone.Types
 
 infixr 1 >>>
+infixr 3 &&&, ***
 
 ||| The identity signal function.
 export
@@ -18,6 +19,17 @@ const = Const
 export %inline
 (>>>) : {c1,c2 : _} -> SF i x c1 -> SF x o c2 -> SF i o (c1 `or` c2)
 (>>>) = Seq c1 c2
+
+export %inline
+(&&&) : {c1,c2 : _} -> SF i a c1 -> SF i b c2 -> SF i (P a b) (c1 `and` c2)
+(&&&) = Fan c1 c2
+
+export %inline
+(***) :  {c1,c2 : _}
+      -> SF i1 o1 c1
+      -> SF i2 o2 c2
+      -> SF (P i1 i2) (P o1 o2) (c1 `and` c2)
+(***) = Par c1 c2
 
 --------------------------------------------------------------------------------
 --          Initialization
