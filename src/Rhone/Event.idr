@@ -35,7 +35,7 @@ afterEachCat ps = mkSFDec go (const ps, Nothing)
   where go :  TimeSpan
            -> Colist (TimeSpan,b)
            -> (Sample a -> Colist (TimeSpan,b), Maybe $ List1 b)
-        go _ []        = (const [], Nothing)
+        go _  []           = (const [], Nothing)
         go dt ((s,v) :: t) = 
           case dt.value `minus` s.value of
             k@(S _) =>
@@ -85,21 +85,21 @@ record DelaySt a where
   -- event backlog
   events : List (Time,a)
 
-delayNext : TimeSpan -> DelaySt a -> Maybe a -> (DelaySt a, Maybe $ List1 a)
-delayNext dt (MkDelaySt delay local events) m =
+delayNext : TimeSpan -> DelaySt a -> (Maybe a -> DelaySt a, Maybe $ List1 a)
+delayNext dt (MkDelaySt delay local events) =
   let newLocal  = local `after` dt
       (es,rest) = span ((<= newLocal) . fst) events
-      newEvents = maybe rest (\v => rest ++ [(newLocal `after` delay, v)]) m
-   in (MkDelaySt delay newLocal newEvents, fromList (map snd es))
+      newEvents = maybe rest (\v => rest ++ [(newLocal `after` delay, v)])
+   in (\m => MkDelaySt delay newLocal (newEvents m), fromList (map snd es))
 
 initSt : TimeSpan -> Maybe a -> DelaySt a
 initSt dt Nothing  = MkDelaySt dt 0 []
 initSt dt (Just x) = MkDelaySt dt 0 [(0 `after` dt, x)]
 
 export
-delayCat : TimeSpan -> SF (E a) (E $ List1 a) Cau
-delayCat dt = mkSF delayNext (\m => (initSt dt m, Nothing))
+delayCat : TimeSpan -> SF (E a) (E $ List1 a) Dec
+delayCat dt = mkSFDec delayNext (\m => initSt dt m, Nothing)
 
 export
-delay : TimeSpan -> SF (E a) (E a) Cau
+delay : TimeSpan -> SF (E a) (E a) Dec
 delay dt = delayCat dt >>> liftE head
