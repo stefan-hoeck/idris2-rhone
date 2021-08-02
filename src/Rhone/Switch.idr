@@ -3,7 +3,14 @@ module Rhone.Switch
 import Rhone.Basic
 import Rhone.Types
 
-export
+export %inline
+rswitch :  {c1,c2 : _}
+        -> SF a (P b $ E c) c1
+        -> (c -> SF a (P b $ E c) c2)
+        -> SF a b (c1 `and` c2)
+rswitch = RSwitch c1 c2
+
+export %inline
 switch :  {c1,c2 : _}
        -> SF a (P b $ E c) c1
        -> (c -> SF a b c2)
