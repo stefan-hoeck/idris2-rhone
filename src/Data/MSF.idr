@@ -27,6 +27,7 @@ data MSF : (m : Type -> Type) -> (i : Type) -> (o : Type) -> Type where
   Arr       :  (i -> o) -> MSF m i o
   Lifted    :  (i -> m o) -> MSF m i o
   Seq       :  MSF m i x -> MSF m x o -> MSF m i o
+  SeqE      :  MSF m i (Event x) -> MSF m x (Event o) -> MSF m i (Event o)
   Par       :  MSF m i1 o1 -> MSF m i2 o2 -> MSF m (i1 * i2) (o1 * o2)
   Fan       :  MSF m i o1 -> MSF m i o2 -> MSF m i (o1 * o2)
   Choice    :  MSF m i1 o1 -> MSF m i2 o2 -> MSF m (i1 + i2) (o1 + o2)
@@ -63,7 +64,7 @@ arrM : (i -> m o) -> MSF m i o
 arrM = Lifted
 
 export %inline
-withSideEffect : Functor m => (o -> m a) -> MSF m o o
+withSideEffect : Functor m => (o -> m ()) -> MSF m o o
 withSideEffect f = Lifted (\o => f o $> o)
 
 ||| Alias for `map`
@@ -240,6 +241,11 @@ step v (Seq sf1 sf2) = do
   (vx,sf1') <- step v  sf1
   (vo,sf2') <- step vx sf2
   pure (vo, Seq sf1' sf2')
+
+step v (SeqE sf1 sf2) = do
+  (Ev vx,sf1') <- step v  sf1 | (NoEv, sf1') => pure (NoEv, SeqE sf1' sf2)
+  (vo,sf2') <- step vx sf2
+  pure (vo, SeqE sf1' sf2')
 
 step (v1,v2) (Par sf1 sf2)  = do
   (o1,sf1') <- step v1 sf1
