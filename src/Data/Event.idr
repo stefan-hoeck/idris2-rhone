@@ -31,6 +31,21 @@ event : Lazy b -> Lazy (a -> b) -> Event a -> b
 event v _ NoEv   = v
 event _ f (Ev x) = f x
 
+public export
+unionL : Event a -> Event a -> Event a
+unionL (Ev x) _ = Ev x
+unionL _      y = y
+
+public export
+unionR : Event a -> Event a -> Event a
+unionR _ (Ev y) = Ev y
+unionR x _      = x
+
+public export
+unionWith : (a -> a -> a) -> Event a -> Event a -> Event a
+unionWith f (Ev x) (Ev y) = Ev $ f x y
+unionWith _ x      y      = unionL x y
+
 --------------------------------------------------------------------------------
 --          Interface Implementations
 --------------------------------------------------------------------------------
@@ -86,9 +101,7 @@ Traversable Event where
 public export
 Alternative Event where
   empty = NoEv
-
-  NoEv <|> e = e
-  e    <|> _ = e
+  x <|> y = unionL x y
 
 public export
 Semigroup a => Semigroup (Event a) where
