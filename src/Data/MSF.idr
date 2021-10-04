@@ -33,9 +33,8 @@ data MSF : (m : Type -> Type) -> (i : Type) -> (o : Type) -> Type where
   Choice    :  MSF m i1 o1 -> MSF m i2 o2 -> MSF m (i1 + i2) (o1 + o2)
   Loop      :  s -> MSF m (i, s) (o, s) -> MSF m i o
 
-  Switch    :  MSF m i (o, Event e)
-            -> (e -> o -> (o,MSF m i (o, Event e)))
-            -> MSF m i o
+  Switch    :  MSF m i (o, Event e) -> (e -> MSF m i o) -> MSF m i o
+  DSwitch   :  MSF m i (o, Event e) -> Inf (e -> MSF m i o) -> MSF m i o
 
   Morph     :  Monad m1
             => (forall c . (a1 -> m1 (b1, c)) -> (a2 -> m2 (b2, c)))
@@ -212,6 +211,22 @@ repeatedly : (o -> o) -> o -> MSF m i o
 repeatedly f = unfold $ dup . f
 
 --------------------------------------------------------------------------------
+--          Switches
+--------------------------------------------------------------------------------
+
+export %inline
+switch : MSF m i (o, Event e) -> (e -> MSF m i o) -> MSF m i o
+switch = Switch
+
+export %inline
+dSwitch : MSF m i (o, Event e) -> Inf (e -> MSF m i o) -> MSF m i o
+dSwitch = DSwitch
+
+export %inline
+drSwitch : MSF m i o -> MSF m (i, Event $ MSF m i o) o
+drSwitch io = dSwitch (first io) drSwitch
+
+--------------------------------------------------------------------------------
 --          Monad Morphisms
 --------------------------------------------------------------------------------
 
@@ -278,5 +293,9 @@ step v (Morph f msf) = do
 step i (Switch sf f) = do
   ((o,Ev e),_) <- step i sf
     | ((o,NoEv),sf2) => pure (o, Switch sf2 f)
-  let (o2,sf2) = f e o
-  pure (o2, Switch sf2 f)
+  step i $ f e
+
+step i (DSwitch sf f) = do
+  ((o,Ev e),_) <- step i sf
+    | ((o,NoEv),sf2) => pure (o, Switch sf2 f)
+  pure (o, f e)
