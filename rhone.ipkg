@@ -4,9 +4,6 @@ authors    = "Stefan Höck"
 depends    = base    >= 0.5.1
            , contrib >= 0.5.1
 
-main       = Main
-executable = runSF
-
 modules    = Data.Event
            , Data.MES
            , Data.MSF

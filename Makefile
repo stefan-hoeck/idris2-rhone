@@ -2,8 +2,10 @@ export IDRIS2 ?= idris2
 
 lib_pkg = rhone.ipkg
 
+test_pkg = test.ipkg
+
 .PHONY: all
-all: lib
+all: lib test
 
 .PHONY: clean-install
 clean-install: clean install
@@ -14,6 +16,10 @@ clean-install-with-src: clean install
 .PHONY: lib
 lib:
 	${IDRIS2} --build ${lib_pkg}
+
+.PHONY: test
+test:
+	${IDRIS2} --build ${test_pkg} && build/exec/runTest -n 1000
 
 .PHONY: install
 install:
