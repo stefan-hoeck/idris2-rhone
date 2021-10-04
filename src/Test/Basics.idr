@@ -57,9 +57,9 @@ prop_elementwise = property $ do
 
 prop_elementwise2 : Property
 prop_elementwise2 = property $ do
-  [n1,ns] <- forAll $ np [smallInt,smallInts]
-  embedI ns [| arr (+1) * arr (+2) |] ===
-  [| map (+n1) ns * map (+n1) ns |]
+  [n1,n2,ns] <- forAll $ np [smallInt,smallInt,smallInts]
+  embedI ns [| arr (+n1) * arr (+n2) |] ===
+  zipWith (*) (map (+n1) ns) (map (+n2) ns)
 
 --------------------------------------------------------------------------------
 --          props

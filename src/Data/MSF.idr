@@ -247,9 +247,11 @@ step v (SeqE sf1 sf2) = do
   (vo,sf2') <- step vx sf2
   pure (vo, SeqE sf1' sf2')
 
-step (v1,v2) (Par sf1 sf2)  = do
-  (o1,sf1') <- step v1 sf1
-  (o2,sf2') <- step v2 sf2
+-- todo: Change this back to a pattern match on
+-- `p`, once #1974 has been fixed.
+step p (Par sf1 sf2)  = do
+  (o1,sf1') <- step (fst p) sf1
+  (o2,sf2') <- step (snd p) sf2
   pure ((o1,o2), Par sf1' sf2')
 
 step v (Fan sf1 sf2)  = do
