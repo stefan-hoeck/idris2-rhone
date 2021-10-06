@@ -159,6 +159,10 @@ export
 when : (i -> Maybe o) -> MSF m i (Event o)
 when f = arr (maybeToEvent . f)
 
+export
+is : Eq i => i -> MSF m i (Event i)
+is v = when $ \x => toMaybe (x == v) x
+
 export %inline
 unionWith : (o -> o -> o)
           -> MSF m i (Event o)
