@@ -93,21 +93,20 @@ Foldable Event where
   null NoEv   = True
   null (Ev a) = False
 
-public export
+public export %inline
 Traversable Event where
   traverse _ NoEv   = pure NoEv
   traverse f (Ev a) = Ev <$> f a
 
-public export
+public export %inline
 Alternative Event where
   empty = NoEv
   x <|> y = unionL x y
 
-public export
+public export %inline
 Semigroup a => Semigroup (Event a) where
-  Ev a <+> Ev b = Ev $ a <+> b
-  _    <+> _    = NoEv
+  (<+>) = unionWith (<+>)
 
-public export
-Monoid a => Monoid (Event a) where
-  neutral = Ev neutral
+public export %inline
+Semigroup a => Monoid (Event a) where
+  neutral = NoEv

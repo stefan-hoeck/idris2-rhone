@@ -20,20 +20,70 @@ public export
 (+) : Type -> Type -> Type
 (+) = Either
 
+||| A monadic streaming function (`MSF`) is used to
+||| provide streams of input values of type `i` to
+||| output values of type `o` in a monadic context `m`.
+|||
+||| The [dunai](TODO: link-to-dunai) library implements
+||| them as `data MSF m i o = MSF (i -> m (o, MSF m i o))`
+||| but this most general for does not go well with
+||| the Idris totality checker.
+|||
+||| It is therefore implemented as a set of primitive
+||| constructors, some of which are truly primitives,
+||| some of which are there for reasons of efficiency.
+||| In later version of this library, the `MSF` might
+||| no longer be publicly exportet, so client code should
+||| use the provided combinators instaed of using the
+||| data constructors directly.
+|||
+||| `MSF` objects can be stepwise evaluated by invoking
+||| function `step`.
 public export
 data MSF : (m : Type -> Type) -> (i : Type) -> (o : Type) -> Type where
+
+  ||| The identity streaming function
   Id        :  MSF m i i
+  
+  ||| The constant streaming function
   Const     :  o -> MSF m i o
+
+  ||| Lifts a pure function to a streaming function
   Arr       :  (i -> o) -> MSF m i o
+
+  ||| Lifts an effectful computation
   Lifted    :  (i -> m o) -> MSF m i o
+
+  ||| Sequencing of streaming functions
   Seq       :  MSF m i x -> MSF m x o -> MSF m i o
+
+  ||| Sequencing of partial streaming functions
   SeqE      :  MSF m i (Event x) -> MSF m x (Event o) -> MSF m i (Event o)
+
+  ||| Parallel combination of streaming functions
   Par       :  MSF m i1 o1 -> MSF m i2 o2 -> MSF m (i1 * i2) (o1 * o2)
+
+  ||| Fanning out input over two streaming functions
   Fan       :  MSF m i o1 -> MSF m i o2 -> MSF m i (o1 * o2)
+
+  ||| Choose an streaming function depending on the input type
   Choice    :  MSF m i1 o1 -> MSF m i2 o2 -> MSF m (i1 + i2) (o1 + o2)
+
+  ||| Feedback loops
   Loop      :  s -> MSF m (i, s) (o, s) -> MSF m i o
 
+  ||| Single time switiching: Upon the first event,
+  ||| the second streaming function is calculated
+  ||| evaluated immediately and used henceforth.
   Switch    :  MSF m i (o, Event e) -> (e -> MSF m i o) -> MSF m i o
+
+  ||| Single time delayed switiching: Upon the first event,
+  ||| the second streaming function is generated but the
+  ||| former output is returned. The freshly 
+  ||| generated streaming function is used in all future
+  ||| evaluation steps.
+  |||
+  ||| It is safe to use this in arbitrary recursive calls.
   DSwitch   :  MSF m i (o, Event e) -> Inf (e -> MSF m i o) -> MSF m i o
 
   Morph     :  Monad m1
@@ -62,6 +112,8 @@ export %inline
 arrM : (i -> m o) -> MSF m i o
 arrM = Lifted
 
+||| Runs the given effectful computation on each input,
+||| passing on the unmodified input afterwards.
 export %inline
 withSideEffect : Functor m => (o -> m ()) -> MSF m o o
 withSideEffect f = Lifted (\o => f o $> o)
@@ -86,6 +138,76 @@ sf >>^ f = Seq sf $ arr f
 export %inline
 (^>>) : (i -> i2) -> MSF m i2 o -> MSF m i o
 f ^>> sf = Seq (arr f) sf
+
+--------------------------------------------------------------------------------
+--          Event Streams
+--------------------------------------------------------------------------------
+
+export %inline
+never : MSF m i (Event o)
+never = const NoEv
+
+export %inline
+always : o -> MSF m i (Event o)
+always = const . Ev
+
+export %inline
+once : o -> MSF m i (Event o)
+once vo = DSwitch (const (Ev vo, Ev never)) id
+
+export
+when : (i -> Maybe o) -> MSF m i (Event o)
+when f = arr (maybeToEvent . f)
+
+export %inline
+unionWith : (o -> o -> o)
+          -> MSF m i (Event o)
+          -> MSF m i (Event o)
+          -> MSF m i (Event o)
+unionWith f = elementwise2 (unionWith f)
+
+export %inline
+unionL :  MSF m i (Event o)
+       -> MSF m i (Event o)
+       -> MSF m i (Event o)
+unionL = elementwise2 unionL
+
+export %inline
+unionR :  MSF m i (Event o)
+       -> MSF m i (Event o)
+       -> MSF m i (Event o)
+unionR = elementwise2 unionR
+
+export %inline
+union :  Semigroup o
+      => MSF m i (Event o)
+      -> MSF m i (Event o)
+      -> MSF m i (Event o)
+union = unionWith (<+>)
+
+export %inline
+(<|>) :   MSF m i (Event o)
+       -> MSF m i (Event o)
+       -> MSF m i (Event o)
+(<|>) = unionL
+
+infixr 1 ??>, ?>>
+
+export %inline
+(??>) : MSF m i (Event x) -> MSF m x (Event o) -> MSF m i (Event o)
+(??>) = SeqE
+
+export %inline
+(?>>) : MSF m i (Event x) -> MSF m x o -> MSF m i (Event o)
+(?>>) y z = y ??> (z >>^ Ev)
+
+export
+onWith : (o -> e -> x) -> MSF m i o -> MSF m i (Event e) -> MSF m i (Event x)
+onWith f = elementwise2 (map . f)
+
+export
+on : MSF m i o -> MSF m i (Event ()) -> MSF m i (Event o)
+on = onWith const
 
 --------------------------------------------------------------------------------
 --          Interfaces
@@ -151,11 +273,14 @@ Fractional o => Fractional (MSF m i o) where
 --          Loops and Stateful computations
 --------------------------------------------------------------------------------
 
+||| Feedback loops: Given an initial state value,
+||| we can feedback the result of each evaluation
+||| step and us it as the new state for the next step.
 export %inline
 feedback : s -> MSF m (i * s) (o * s) -> MSF m i o
 feedback = Loop
 
-||| Delay a signal by one sample
+||| Delay a stream by one sample.
 export %inline
 iPre : o -> MSF m o o
 iPre v = feedback v (arr $ \(new,delayed) => (delayed,new))
@@ -199,11 +324,13 @@ export
 mealy : (i -> s -> (o, s)) -> s -> MSF m i o
 mealy f s0 = feedback s0 $ arr (uncurry f)
 
+||| Unfolds a function over an initial state
+||| value.
 export
 unfold : (s -> (o, s)) -> s -> MSF m i o
 unfold f ini = feedback ini (arr $ f . snd)
 
-||| Generate outputs using a step-wise generation function and an initial
+||| Generates output using a step-wise generation function and an initial
 ||| value. Version of 'unfold' in which the output and the new accumulator
 ||| are the same.
 export
@@ -222,9 +349,13 @@ export %inline
 dSwitch : MSF m i (o, Event e) -> Inf (e -> MSF m i o) -> MSF m i o
 dSwitch = DSwitch
 
-export %inline
+export
 drSwitch : MSF m i o -> MSF m (i, Event $ MSF m i o) o
 drSwitch io = dSwitch (first io) drSwitch
+
+export
+resetOn : MSF m i o -> MSF m i (Event ()) -> MSF m i o
+resetOn sf ev = Fan Id (ev >>^ ($> sf)) >>> drSwitch sf
 
 --------------------------------------------------------------------------------
 --          Monad Morphisms
