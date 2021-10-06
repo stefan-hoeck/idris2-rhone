@@ -160,8 +160,12 @@ when : (i -> Maybe o) -> MSF m i (Event o)
 when f = arr (maybeToEvent . f)
 
 export
+filter : (i -> Bool) -> MSF m i (Event i)
+filter f = when $ \x => toMaybe (f x) x
+
+export
 is : Eq i => i -> MSF m i (Event i)
-is v = when $ \x => toMaybe (x == v) x
+is v = filter (v ==)
 
 export %inline
 unionWith : (o -> o -> o)
@@ -210,7 +214,7 @@ onWith : (o -> e -> x) -> MSF m i o -> MSF m i (Event e) -> MSF m i (Event x)
 onWith f = elementwise2 (map . f)
 
 export
-on : MSF m i o -> MSF m i (Event ()) -> MSF m i (Event o)
+on : MSF m i o -> MSF m i (Event e) -> MSF m i (Event o)
 on = onWith const
 
 --------------------------------------------------------------------------------
@@ -297,6 +301,10 @@ accumulateWith f ini = feedback ini (arr g)
   where g : (i,o) -> (o,o)
         g (inp,acc) = let acc' = f inp acc in (acc',acc')
 
+export
+stepper : o -> MSF m (Event o) o
+stepper = accumulateWith (\e,vo => fromEvent vo e) 
+
 ||| Counts the number of scans of the signal function.
 export
 count : Num n => MSF m i n
@@ -360,6 +368,18 @@ drSwitch io = dSwitch (first io) drSwitch
 export
 resetOn : MSF m i o -> MSF m i (Event ()) -> MSF m i o
 resetOn sf ev = Fan Id (ev >>^ ($> sf)) >>> drSwitch sf
+
+export
+switchOn : (a -> MSF m i o) -> MSF m i (Event a) -> a -> MSF m i o
+switchOn f ev va = Fan Id (ev >>^ map f) >>> drSwitch (f va)
+
+export
+switchOnM :  Applicative m
+          => (a -> m (MSF m i o))
+          -> MSF m i (Event a)
+          -> MSF m i o
+          -> MSF m i o
+switchOnM f ev sf0 = Fan Id (ev >>> arrM (traverse f)) >>> drSwitch sf0
 
 --------------------------------------------------------------------------------
 --          Monad Morphisms
