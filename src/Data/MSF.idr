@@ -452,5 +452,5 @@ step i (Switch sf f) = do
 
 step i (DSwitch sf f) = do
   ((o,Ev e),_) <- step i sf
-    | ((o,NoEv),sf2) => pure (o, Switch sf2 f)
+    | ((o,NoEv),sf2) => pure (o, DSwitch sf2 f)
   pure (o, f e)
