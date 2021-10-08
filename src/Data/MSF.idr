@@ -148,84 +148,6 @@ secondArg : MSF m (i,x) o -> x -> MSF m i o
 secondArg sf vx = Seq (Fan Id (Const vx)) sf
 
 --------------------------------------------------------------------------------
---          Event Streams
---------------------------------------------------------------------------------
-
-export %inline
-never : MSF m i (Event o)
-never = const NoEv
-
-export %inline
-always : o -> MSF m i (Event o)
-always = const . Ev
-
-export %inline
-once : o -> MSF m i (Event o)
-once vo = DSwitch (const (Ev vo, Ev never)) id
-
-export
-when : (i -> Maybe o) -> MSF m i (Event o)
-when f = arr (maybeToEvent . f)
-
-export
-filter : (i -> Bool) -> MSF m i (Event i)
-filter f = when $ \x => toMaybe (f x) x
-
-export
-is : Eq i => i -> MSF m i (Event i)
-is v = filter (v ==)
-
-export %inline
-unionWith : (o -> o -> o)
-          -> MSF m i (Event o)
-          -> MSF m i (Event o)
-          -> MSF m i (Event o)
-unionWith f = elementwise2 (unionWith f)
-
-export %inline
-unionL :  MSF m i (Event o)
-       -> MSF m i (Event o)
-       -> MSF m i (Event o)
-unionL = elementwise2 unionL
-
-export %inline
-unionR :  MSF m i (Event o)
-       -> MSF m i (Event o)
-       -> MSF m i (Event o)
-unionR = elementwise2 unionR
-
-export %inline
-union :  Semigroup o
-      => MSF m i (Event o)
-      -> MSF m i (Event o)
-      -> MSF m i (Event o)
-union = unionWith (<+>)
-
-export %inline
-(<|>) :   MSF m i (Event o)
-       -> MSF m i (Event o)
-       -> MSF m i (Event o)
-(<|>) = unionL
-
-infixr 1 ??>, ?>>
-
-export %inline
-(??>) : MSF m i (Event x) -> MSF m x (Event o) -> MSF m i (Event o)
-(??>) = SeqE
-
-export %inline
-(?>>) : MSF m i (Event x) -> MSF m x o -> MSF m i (Event o)
-(?>>) y z = y ??> (z >>^ Ev)
-
-export
-onWith : (o -> e -> x) -> MSF m i o -> MSF m i (Event e) -> MSF m i (Event x)
-onWith f = elementwise2 (map . f)
-
-export
-on : MSF m i o -> MSF m i (Event e) -> MSF m i (Event o)
-on = onWith const
-
---------------------------------------------------------------------------------
 --          Interfaces
 --------------------------------------------------------------------------------
 
@@ -284,6 +206,128 @@ Integral o => Integral (MSF m i o) where
 export %inline
 Fractional o => Fractional (MSF m i o) where
   (/)  = elementwise2 (/)
+
+export
+observeWith : MSF m o () -> MSF m o o
+observeWith h = (h &&& id) >>^ snd
+
+--------------------------------------------------------------------------------
+--          Event Streams
+--------------------------------------------------------------------------------
+
+export %inline
+never : MSF m i (Event o)
+never = const NoEv
+
+export %inline
+always : o -> MSF m i (Event o)
+always = const . Ev
+
+export %inline
+once : o -> MSF m i (Event o)
+once vo = DSwitch (const (Ev vo, Ev never)) id
+
+export
+when : (i -> Maybe o) -> MSF m i (Event o)
+when f = arr (maybeToEvent . f)
+
+export
+filter : (i -> Bool) -> MSF m i (Event i)
+filter f = when $ \x => toMaybe (f x) x
+
+export
+is : Eq i => i -> MSF m i (Event i)
+is v = filter (v ==)
+
+export
+ifLeft : MSF m (Either a b) (Event a)
+ifLeft = arr $ either Ev (const NoEv)
+
+export
+ifRight : MSF m (Either a b) (Event b)
+ifRight = arr $ either (const NoEv) Ev
+
+export
+ifJust : MSF m (Maybe a) (Event a)
+ifJust = arr maybeToEvent
+
+export
+ifNothing : MSF m (Maybe a) (Event ())
+ifNothing = arr $ maybe (Ev ()) (const NoEv)
+
+export %inline
+unionWith : (o -> o -> o)
+          -> MSF m i (Event o)
+          -> MSF m i (Event o)
+          -> MSF m i (Event o)
+unionWith f = elementwise2 (unionWith f)
+
+export %inline
+unionL :  MSF m i (Event o)
+       -> MSF m i (Event o)
+       -> MSF m i (Event o)
+unionL = elementwise2 unionL
+
+export %inline
+unionR :  MSF m i (Event o)
+       -> MSF m i (Event o)
+       -> MSF m i (Event o)
+unionR = elementwise2 unionR
+
+export %inline
+union :  Semigroup o
+      => MSF m i (Event o)
+      -> MSF m i (Event o)
+      -> MSF m i (Event o)
+union = unionWith (<+>)
+
+export %inline
+(<|>) :   MSF m i (Event o)
+       -> MSF m i (Event o)
+       -> MSF m i (Event o)
+(<|>) = unionL
+
+infixr 1 ??>, ?>>, >-
+
+export %inline
+(??>) : MSF m i (Event x) -> MSF m x (Event o) -> MSF m i (Event o)
+(??>) = SeqE
+
+export %inline
+(?>>) : MSF m i (Event x) -> MSF m x o -> MSF m i (Event o)
+(?>>) y z = y ??> (z >>^ Ev)
+
+export %inline
+(>-) : MSF m i (Event x) -> MSF m x () -> MSF m i ()
+(>-) y z = Seq (y ?>> z) $ const ()
+
+export
+onWith : (o -> e -> x) -> MSF m i o -> MSF m i (Event e) -> MSF m i (Event x)
+onWith f = elementwise2 (map . f)
+
+export
+on : MSF m i o -> MSF m i (Event e) -> MSF m i (Event o)
+on = onWith const
+
+export
+eventOn : MSF m i (Event o) -> MSF m i (Event e) -> MSF m i (Event o)
+eventOn sf e = (sf `on` e) >>^ join
+
+export
+leftOn : MSF m i (Either o1 o2) -> MSF m i (Event e) -> MSF m i (Event o1)
+leftOn sf = eventOn $ sf >>> ifLeft
+
+export
+rightOn : MSF m i (Either o1 o2) -> MSF m i (Event e) -> MSF m i (Event o2)
+rightOn sf = eventOn $ sf >>> ifRight
+
+export
+justOn : MSF m i (Maybe o) -> MSF m i (Event e) -> MSF m i (Event o)
+justOn sf = eventOn $ sf >>> ifJust
+
+export
+nothingOn : MSF m i (Maybe o) -> MSF m i (Event e) -> MSF m i (Event ())
+nothingOn sf = eventOn $ sf >>> ifNothing
 
 --------------------------------------------------------------------------------
 --          Loops and Stateful computations
