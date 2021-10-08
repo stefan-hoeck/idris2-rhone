@@ -139,6 +139,14 @@ export %inline
 (^>>) : (i -> i2) -> MSF m i2 o -> MSF m i o
 f ^>> sf = Seq (arr f) sf
 
+export
+firstArg : MSF m (x,i) o -> x -> MSF m i o
+firstArg sf vx = Seq (Fan (Const vx) Id) sf
+
+export
+secondArg : MSF m (i,x) o -> x -> MSF m i o
+secondArg sf vx = Seq (Fan Id (Const vx)) sf
+
 --------------------------------------------------------------------------------
 --          Event Streams
 --------------------------------------------------------------------------------
