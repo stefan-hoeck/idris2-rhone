@@ -12,7 +12,7 @@ export
 embed : Monad m => List i  -> MSF m i o -> m (List o)
 embed [] _          = pure []
 embed (vi :: is) sf = do
-  (vo,sf2) <- step vi sf
+  (vo,sf2) <- step sf vi
   os       <- embed is sf2
   pure $ vo :: os
 
@@ -52,7 +52,7 @@ prop_arr = property $ do
 prop_elementwise : Property
 prop_elementwise = property $ do
   [n1,n2,ns] <- forAll $ np [smallInt,smallInt,smallInts]
-  embedI ns (elementwise (*n1) (arr (+n2))) ===
+  embedI ns (map (*n1) (arr (+n2))) ===
     map (\n => n1 * (n + n2)) ns
 
 prop_elementwise2 : Property
