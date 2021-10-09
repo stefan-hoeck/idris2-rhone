@@ -1,12 +1,14 @@
 module Data.MSF
 
-import Data.Maybe
-import public Data.SOP
+import Control.Monad.Identity
+import Data.List.Elem
 import Data.VectorSpace
+import public Data.SOP
 
 %default total
 
 mutual
+  public export
   data MSFList :  (m : Type -> Type)
                -> (is : List Type)
                -> (os : List Type)
@@ -172,11 +174,22 @@ par : MSFList m is os -> MSF m (NP I is) (NP I os)
 par = Par
 
 ||| Broadcasts an input value across a list of MSFs,
-||| all of which must take accept the same type of input.
+||| all of which must accept the same type of input.
 ||| This is a generalization of `(&&&)` from `Control.Arrow`.
 export %inline
 fan : FanList m i os -> MSF m i (NP I os) 
 fan = Fan
+
+||| Like `fan` but discard the results.
+||| This is mainly useful for broadcasting to data sinks
+||| (streaming functions that do not produce any interesting
+||| out put).
+|||
+||| TODO: Should we require a proof here that `os` is a list
+|||       of `Unit`?
+export %inline
+fan_ : FanList m i os -> MSF m i ()
+fan_ sfs = Fan sfs >>> Const ()
 
 export %inline
 elementwise2 : (o1 -> o2 -> o3) -> MSF m i o1 -> MSF m i o2 -> MSF m i o3
@@ -206,6 +219,38 @@ choice = Choice
 export %inline
 collect : CollectList m is o -> MSF m (NS I is) o
 collect = Collect
+
+export
+either :  MSF m i1 o1
+       -> MSF m i2 o2
+       -> MSF m (Either i1 i2) (Either o1 o2)
+either sf1 sf2 =   either Z (S . Z)
+               ^>> choice [sf1,sf2]
+               >>^ collapseNS . hapNS [Left,Right]
+
+export
+maybe :  MSF m i1 o1
+      -> MSF m () ()
+      -> MSF m (Maybe i1) (Maybe o1)
+maybe sf1 sf2 =   maybe (S $ Z ()) Z
+              ^>> choice [sf1,sf2]
+              >>^ collapseNS . hapNS [Just, const Nothing]
+
+export
+ifLeft : MSF m i o -> MSF m (Either i a) (Either o a)
+ifLeft sf = either sf id
+
+export
+ifRight : MSF m i o -> MSF m (Either a i) (Either a o)
+ifRight sf = either id sf
+
+export
+ifJust : MSF m a b -> MSF m (Maybe a) (Maybe b)
+ifJust sf = maybe sf id
+
+export
+ifNothing : MSF m () () -> MSF m (Maybe a) (Maybe a)
+ifNothing sf = maybe id sf
 
 --------------------------------------------------------------------------------
 --          Interfaces
@@ -382,78 +427,78 @@ observeWith h = Fan [h, id] >>^ snd
 -- nothingOn : MSF m i (Maybe o) -> MSF m i (Event e) -> MSF m i (Event ())
 -- nothingOn sf = eventOn $ sf >>> ifNothing
 -- 
--- --------------------------------------------------------------------------------
--- --          Loops and Stateful computations
--- --------------------------------------------------------------------------------
--- 
--- ||| Feedback loops: Given an initial state value,
--- ||| we can feedback the result of each evaluation
--- ||| step and us it as the new state for the next step.
--- export %inline
--- feedback : s -> MSF m (i * s) (o * s) -> MSF m i o
--- feedback = Loop
--- 
--- ||| Delay a stream by one sample.
--- export %inline
--- iPre : o -> MSF m o o
--- iPre v = feedback v (arr $ \(new,delayed) => (delayed,new))
--- 
--- ||| Applies a function to the input and an accumulator,
--- ||| outputting the updated accumulator.
--- export
--- accumulateWith : (i -> o -> o) -> o -> MSF m i o
--- accumulateWith f ini = feedback ini (arr g)
---   where g : (i,o) -> (o,o)
---         g (inp,acc) = let acc' = f inp acc in (acc',acc')
--- 
+--------------------------------------------------------------------------------
+--          Loops and Stateful computations
+--------------------------------------------------------------------------------
+
+||| Feedback loops: Given an initial state value,
+||| we can feedback the result of each evaluation
+||| step and us it as the new state for the next step.
+export %inline
+feedback : s -> MSF m (i, s) (o, s) -> MSF m i o
+feedback = Loop
+
+||| Delay a stream by one sample.
+export %inline
+iPre : o -> MSF m o o
+iPre v = feedback v (arr $ \(new,delayed) => (delayed,new))
+
+||| Applies a function to the input and an accumulator,
+||| outputting the updated accumulator.
+export
+accumulateWith : (i -> o -> o) -> o -> MSF m i o
+accumulateWith f ini = feedback ini (arr g)
+  where g : (i,o) -> (o,o)
+        g (inp,acc) = let acc' = f inp acc in (acc',acc')
+
 -- export
 -- stepper : o -> MSF m (Event o) o
 -- stepper = accumulateWith (\e,vo => fromEvent vo e) 
--- 
--- ||| Counts the number of scans of the signal function.
--- export
--- count : Num n => MSF m i n
--- count = 1 >>> accumulateWith (+) 0
--- 
--- ||| Sums the inputs, starting from an initial vector.
--- export
--- sumFrom : VectorSpace v => v -> MSF m v v
--- sumFrom = accumulateWith (^+^)
--- 
--- ||| Sums the inputs, starting from zero.
--- export
--- sumS : VectorSpace v => MSF m v v
--- sumS = sumFrom zeroVector
--- 
--- ||| Accumulate the inputs, starting from an initial value.
--- export
--- appendFrom : Semigroup v => v -> MSF m v v
--- appendFrom = accumulateWith (<+>)
--- 
--- ||| Accumulate the inputs, starting from `neutral`
--- export
--- append : Monoid n => MSF m n n
--- append = appendFrom neutral
--- 
--- ||| Applies a transfer function to the input and an accumulator,
--- ||| returning the updated accumulator and output.
--- export
--- mealy : (i -> s -> (o, s)) -> s -> MSF m i o
--- mealy f s0 = feedback s0 $ arr (uncurry f)
--- 
--- ||| Unfolds a function over an initial state
--- ||| value.
--- export
--- unfold : (s -> (o, s)) -> s -> MSF m i o
--- unfold f ini = feedback ini (arr $ f . snd)
--- 
--- ||| Generates output using a step-wise generation function and an initial
--- ||| value. Version of 'unfold' in which the output and the new accumulator
--- ||| are the same.
--- export
--- repeatedly : (o -> o) -> o -> MSF m i o
--- repeatedly f = unfold $ dup . f
--- 
+
+||| Counts the number of scans of the signal function.
+export
+count : Num n => MSF m i n
+count = 1 >>> accumulateWith (+) 0
+
+||| Sums the inputs, starting from an initial vector.
+export
+sumFrom : VectorSpace v => v -> MSF m v v
+sumFrom = accumulateWith (^+^)
+
+||| Sums the inputs, starting from zero.
+export
+sumS : VectorSpace v => MSF m v v
+sumS = sumFrom zeroVector
+
+||| Accumulate the inputs, starting from an initial value.
+export
+appendFrom : Semigroup v => v -> MSF m v v
+appendFrom = accumulateWith (<+>)
+
+||| Accumulate the inputs, starting from `neutral`
+export
+append : Monoid n => MSF m n n
+append = appendFrom neutral
+
+||| Applies a transfer function to the input and an accumulator,
+||| returning the updated accumulator and output.
+export
+mealy : (i -> s -> (o, s)) -> s -> MSF m i o
+mealy f s0 = feedback s0 $ arr (uncurry f)
+
+||| Unfolds a function over an initial state
+||| value.
+export
+unfold : (s -> (o, s)) -> s -> MSF m i o
+unfold f ini = feedback ini (arr $ f . snd)
+
+||| Generates output using a step-wise generation function and an initial
+||| value. Version of 'unfold' in which the output and the new accumulator
+||| are the same.
+export
+repeatedly : (o -> o) -> o -> MSF m i o
+repeatedly f = unfold $ dup . f
+
 -- --------------------------------------------------------------------------------
 -- --          Switches
 -- --------------------------------------------------------------------------------
@@ -591,3 +636,19 @@ mutual
 --   ((o,Ev e),_) <- step i sf
 --     | ((o,NoEv),sf2) => pure (o, DSwitch sf2 f)
 --   pure (o, f e)
+
+--------------------------------------------------------------------------------
+--          Running MSFs
+--------------------------------------------------------------------------------
+
+export
+embed : Monad m => List i -> MSF m i o -> m (List o)
+embed [] _          = pure []
+embed (vi :: is) sf = do
+  (vo,sf2) <- step sf vi
+  os       <- embed is sf2
+  pure $ vo :: os
+
+export
+embedI : List i -> MSF Identity i o -> List o
+embedI is = runIdentity . embed is

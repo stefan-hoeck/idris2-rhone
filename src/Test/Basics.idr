@@ -8,18 +8,6 @@ import Hedgehog
 
 %default total
 
-export
-embed : Monad m => List i  -> MSF m i o -> m (List o)
-embed [] _          = pure []
-embed (vi :: is) sf = do
-  (vo,sf2) <- step sf vi
-  os       <- embed is sf2
-  pure $ vo :: os
-
-export
-embedI : List i  -> MSF Identity i o -> List o
-embedI is = runIdentity . embed is
-
 --------------------------------------------------------------------------------
 --          Generators
 --------------------------------------------------------------------------------
