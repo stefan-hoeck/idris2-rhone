@@ -195,12 +195,14 @@ secondArg sf vx = Fan [Id, Const vx] >>> sf
 --------------------------------------------------------------------------------
 
 ||| Choose a streaming function to run depending the input value
+||| This is a generalization of `(+++)` from `Control.Arrow`.
 export %inline
 choice : MSFList m is os -> MSF m (NS I is) (NS I os) 
 choice = Choice
 
 ||| Choose a streaming function from a list of function yielding
 ||| all the same output.
+||| This is a generalization of `(\|/)` from `Control.Arrow`.
 export %inline
 collect : CollectList m is o -> MSF m (NS I is) o
 collect = Collect
