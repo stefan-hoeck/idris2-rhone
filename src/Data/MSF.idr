@@ -228,16 +228,20 @@ once : o -> MSF m i (Event o)
 once vo = DSwitch (const (Ev vo, Ev never)) id
 
 export
-when : (i -> Maybe o) -> MSF m i (Event o)
-when f = arr (maybeToEvent . f)
+arrMaybe : (i -> Maybe o) -> MSF m i (Event o)
+arrMaybe f = arr (maybeToEvent . f)
 
 export
 filter : (i -> Bool) -> MSF m i (Event i)
-filter f = when $ \x => toMaybe (f x) x
+filter f = arrMaybe $ \x => toMaybe (f x) x
 
 export
 is : Eq i => i -> MSF m i (Event i)
 is v = filter (v ==)
+
+export
+isNot : Eq i => i -> MSF m i (Event i)
+isNot v = filter (v /=)
 
 export
 ifLeft : MSF m (Either a b) (Event a)
@@ -287,47 +291,47 @@ export %inline
        -> MSF m i (Event o)
 (<|>) = unionL
 
-infixr 1 ??>, ?>>, >-
+infixr 1 ->-, ->>, >|
 
 export %inline
-(??>) : MSF m i (Event x) -> MSF m x (Event o) -> MSF m i (Event o)
-(??>) = SeqE
+(->-) : MSF m i (Event x) -> MSF m x (Event o) -> MSF m i (Event o)
+(->-) = SeqE
 
 export %inline
-(?>>) : MSF m i (Event x) -> MSF m x o -> MSF m i (Event o)
-(?>>) y z = y ??> (z >>^ Ev)
+(->>) : MSF m i (Event x) -> MSF m x o -> MSF m i (Event o)
+(->>) y z = y ->- (z >>^ Ev)
 
 export %inline
-(>-) : MSF m i (Event x) -> MSF m x () -> MSF m i ()
-(>-) y z = Seq (y ?>> z) $ const ()
+(>|) : MSF m i (Event x) -> MSF m x () -> MSF m i ()
+(>|) y z = (y ->> z) >>> const ()
 
 export
-onWith : (o -> e -> x) -> MSF m i o -> MSF m i (Event e) -> MSF m i (Event x)
-onWith f = elementwise2 (map . f)
+applyOn : (o -> e -> x) -> MSF m i (Event e) -> MSF m i o -> MSF m i (Event x)
+applyOn f = elementwise2 $ \ev,vo => f vo <$> ev
 
 export
-on : MSF m i o -> MSF m i (Event e) -> MSF m i (Event o)
-on = onWith const
+when : MSF m i (Event e) -> MSF m i o -> MSF m i (Event o)
+when = applyOn const
 
 export
-eventOn : MSF m i (Event o) -> MSF m i (Event e) -> MSF m i (Event o)
-eventOn sf e = (sf `on` e) >>^ join
+onlyWhen : MSF m i (Event o) -> MSF m i (Event o) -> MSF m i (Event o)
+onlyWhen e sf = when e sf >>^ join
 
 export
-leftOn : MSF m i (Either o1 o2) -> MSF m i (Event e) -> MSF m i (Event o1)
-leftOn sf = eventOn $ sf >>> ifLeft
+leftOn : MSF m i (Event e) -> MSF m i (Either o1 o2) -> MSF m i (Event o1)
+leftOn e sf = when e sf ->- ifLeft
 
 export
-rightOn : MSF m i (Either o1 o2) -> MSF m i (Event e) -> MSF m i (Event o2)
-rightOn sf = eventOn $ sf >>> ifRight
+rightOn : MSF m i (Event e) -> MSF m i (Either o1 o2) -> MSF m i (Event o2)
+rightOn e sf = when e sf ->- ifRight
 
 export
-justOn : MSF m i (Maybe o) -> MSF m i (Event e) -> MSF m i (Event o)
-justOn sf = eventOn $ sf >>> ifJust
+justOn : MSF m i (Event e) -> MSF m i (Maybe o) -> MSF m i (Event o)
+justOn e sf = when e sf ->- ifJust
 
 export
-nothingOn : MSF m i (Maybe o) -> MSF m i (Event e) -> MSF m i (Event ())
-nothingOn sf = eventOn $ sf >>> ifNothing
+nothingOn : MSF m i (Event e) -> MSF m i (Maybe o) -> MSF m i (Event ())
+nothingOn e sf = when e sf ->- ifNothing
 
 --------------------------------------------------------------------------------
 --          Loops and Stateful computations
