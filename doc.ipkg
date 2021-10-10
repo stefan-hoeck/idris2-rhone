@@ -7,5 +7,6 @@ depends    = base      >= 0.5.1
            , sop       >= 0.5.0
 
 modules    = Doc.Basics
+           , Doc.UIEx1
 
 sourcedir  = "src"

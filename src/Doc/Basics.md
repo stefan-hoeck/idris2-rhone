@@ -134,7 +134,7 @@ Doc.Basics> embedI [(),()] $ calc (pure 1) (const $ pure ())
 [(), ()]
 ```
 
-Lets come up with a better context: The state monad.
+Let's come up with a better context: The state monad.
 
 ```idris
 record AppSt where
@@ -313,20 +313,26 @@ time : MSF m DTime Time
 time = accumulateWith (+) 0
 ```
 
+We can also use time deltas to calculate integrals
+of time-varying entities:
+
 ```idris
-record IntState where
-  constructor MkIntState
-  accumulated : Double
-  previous    : Double
+integral_ : MSF m (NP I [Double,DTime]) Double
+integral_ = feedback 0 . arr $ \([v,dt],acc) => dup (acc + v * cast dt)
+```
 
-integrate : (NP I [Double,DTime], IntState) -> (Double,IntState)
-integrate ([v,dt],MkIntState acc pre) =
-  let acc2 = acc + (v + pre) / 2 * cast dt
-   in (acc2, MkIntState acc2 v)
+The above uses the `feedback` primitive directly. However, nn this case it
+is more convenient, to use `accumulateWith`:
 
+```idris
 integral : MSF m (NP I [Double,DTime]) Double
-integral = feedback (MkIntState 0 0) (arr integrate)
+integral = accumulateWith (\[v,dt],acc => acc + v * cast dt) 0
+```
 
+With this we can simulate the movement (velocity
+and height) of a ball in vertical free fall:
+
+```idris
 Acceleration : Type
 Acceleration = Double
 
@@ -345,16 +351,14 @@ velocity v0 = integral + const v0
 position : (p0 : Position) -> MSF m (NP I [Velocity,DTime]) Position
 position p0 = integral + const p0
 
-namespace Ball
-  public export
-  record Ball where
-    constructor MkBall
-    position : Position
-    velocity : Velocity
+record Ball where
+  constructor MkBall
+  pos : Position
+  vel : Velocity
 
 ball : (ini : Ball) -> MSF m DTime Ball
-ball ini =   fan [fan [const g, id] >>> velocity ini.velocity, id]
-         >>> fan [position ini.position, arr fst]
+ball ini =   fan [fan [const g, id] >>> velocity ini.vel, id]
+         >>> fan [position ini.pos, arr fst]
          >>^ (\[p,v] => MkBall p v)
 
 ballGame : (ini : Ball) -> MSF m DTime String
@@ -366,3 +370,6 @@ ballGame ini = fan [time, ball ini] >>^ dispBall
 testBallGame : List String
 testBallGame = embedI (0 :: replicate 10 1) (ballGame $ MkBall 500 0)
 ```
+
+We will come back to this example once we have a better
+understanding of using the monadic contexts involved.

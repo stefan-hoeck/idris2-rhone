@@ -2,6 +2,7 @@ module Data.MSF
 
 import Control.Monad.Identity
 import Data.List.Elem
+import Data.Maybe
 import Data.VectorSpace
 import public Data.SOP
 
@@ -251,6 +252,10 @@ ifJust sf = maybe sf id
 export
 ifNothing : MSF m () () -> MSF m (Maybe a) (Maybe a)
 ifNothing sf = maybe id sf
+
+export
+ifTrue : (f : i -> Bool) -> MSF m i o -> MSF m i (Maybe o)
+ifTrue f sf = (\vi => toMaybe (f vi) vi) ^>> ifJust sf
 
 --------------------------------------------------------------------------------
 --          Interfaces
