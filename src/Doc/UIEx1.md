@@ -1,18 +1,17 @@
 ## UI Example 1 : Accumulating Button Clicks
 
-In this blog post, I describe how to set up
-an MSF for describing a user interface with
-three buttons and a counter: One button
-for increasing the counter, one for decreasing
-the counter, and one for resetting the counter
-to zero. The buttons for increasing and decreasing
-should be disabled once the counter gets to
+In this example, I'll show how to set up an MSF for describing a
+user interface with three buttons and a counter: One button
+for increasing the counter, one for decreasing the counter,
+and one for resetting the counter to zero. The buttons for
+increasing and decreasing should be disabled once the counter gets too
 small or too large. Likewise, the button for
 resetting should be disabled if the counter is
 at zero.
 
-Here's a data type to describe the state of
-the UI:
+We'll define our own effect interface for this
+allowing us to test the functionality of our MSF
+in a pure environment.
 
 ```idris
 module Doc.UIEx1
@@ -24,68 +23,25 @@ import Generics.Derive
 %language ElabReflection
 %default total
 
-record UI where
-  constructor MkUI
-  inc     : Bool
-  dec     : Bool
-  reset   : Bool
-  out     : String
-
-ini : UI
-ini = MkUI True True True ""
-
-%runElab derive "UI" [Generic,Meta,Eq,Show]
+interface Monad m => MonadUI m where
+  disableInc   : Bool -> m ()
+  disableDec   : Bool -> m ()
+  disableReset : Bool -> m ()
+  dispCount    : Int8 -> m ()
 ```
 
-We simulate interacting with our user interface through
-the `State` monad:
-
-```idris
-MonadUI : Type -> Type
-MonadUI = State UI
-
-disableInc : Bool -> MonadUI ()
-disableInc b = modify $ record { inc = not b}
-
-disableDec : Bool -> MonadUI ()
-disableDec b = modify $ record { dec = not b}
-
-disableReset : Bool -> MonadUI ()
-disableReset b = modify $ record { reset = not b}
-
-dispCount : Int8 -> MonadUI ()
-dispCount n = modify $ record { out = #"Count: \#{show n}"#}
-```
-
-Finally, we use a data type to simulate UI events:
-
-```idris
-data Ev = Inc | Dec | Reset
-```
-
-However, we assume the user interface will not allow some
-of these if the corresponding button is disabled. We therefore
-use an initial MSF to simulate the correct behavior of
-the UI, which will only pass on valid events:
-
-```idris
-convertEvent : MSF MonadUI Ev (Maybe (Int8 -> Int8))
-convertEvent = fan [arrM (const get), id] >>> ifTrue valid (arr $ toFun . snd)
-  where valid : NP I [UI,Ev] -> Bool
-        valid [ui,Inc]   = ui.inc
-        valid [ui,Dec]   = ui.dec
-        valid [ui,Reset] = ui.reset
-
-        toFun : Ev -> Int8 -> Int8
-        toFun Inc   = (+1)
-        toFun Dec   = (+ (-1))
-        toFun Reset = const 0
-```
-
+We assume that upon generating the widgets of the UI,
+our program will register event handlers reacting on
+certain button clicks. The events they'll fire will be
+functions of type `Int8 -> Int8` used to modify
+the application state.
 We can now write the logic of our user interface:
 
 ```idris
-msf : MSF MonadUI (Int8 -> Int8) ()
+Ev : Type
+Ev = Int8 -> Int8
+
+msf : MonadUI m => MSF m Ev ()
 msf = accumulateWith apply 0 >>>
       fan_ [ arrM dispCount
            , (>= 10)    ^>> arrM disableInc
@@ -94,16 +50,112 @@ msf = accumulateWith apply 0 >>>
            ]
 ```
 
+As you can see, accumulating the state is only a small
+part. Most of the logic goes into adjusting the UI
+to the updated state. The `fan_` function is convenient
+for this.
+
+For testing, we will use the state monad with a custom
+record for representing our user interface. Our state
+will monitor for each button whether it is enabled or
+not, as well as the content of an output field
+or HTML element displaying the current counter:
+  
+```idris
+record UI where
+  constructor MkUI
+  inc   : Bool
+  dec   : Bool
+  reset : Bool
+  out   : String
+
+ini : UI
+ini = MkUI True True True ""
+
+%runElab derive "UI" [Generic,Meta,Eq,Show]
+
+MonadUI (State UI) where
+  disableInc   b = modify $ record { inc = not b }
+  disableDec   b = modify $ record { dec = not b }
+  disableReset b = modify $ record { reset = not b }
+  dispCount    n = modify $ record { out = #"Count: \#{show n}"# }
+```
+
+Finally, we use a data type for simulating user
+interactions: An enum describing the button a user clicked:
+
+```idris
+data Input = Inc | Dec | Reset
+
+%runElab derive "Input" [Generic,Meta,Eq,Show]
+```
+
+However, when we simulate the UI, we don't want to
+have to keep track of whether every button click makes
+sense at the current state. We assume the user interface
+will not pass on a click on a disabled butteon, and we
+use a pre-processing MSF to simulate this behavior:
+
+```idris
+onInput : MSF (State UI) Input (NS I [Ev,Input])
+onInput = fan [get, id] >>> bool valid >>> choice [arr toFun, arr snd]
+  where valid : NP I [UI,Input] -> Bool
+        valid [ui,Inc]   = ui.inc
+        valid [ui,Dec]   = ui.dec
+        valid [ui,Reset] = ui.reset
+
+        toFun : NP I [UI,Input] -> Int8 -> Int8
+        toFun [_,Inc  ] = (+  1)
+        toFun [_,Dec  ] = (+ -1)
+        toFun [_,Reset] = const 0
+```
+
 Finally, putting everything together, we run a simulation
 of the application. We provide a list of user actions,
 collecting a string of the UI state after each action
-accepted by the UI, and an empty string if the action
+accepted by the UI, and a dummy string if the action
 was invalid:
 
 ```idris
-simulate : List Ev -> List String
+simulate : List Input -> List String
 simulate evs = evalState ini . embed evs
-             $   convertEvent
-             >>> ifJust (msf >>> arrM (const get) >>^ show)
-             >>^ fromMaybe ""
+             $ onInput >>> collect
+                 [ msf >>> get >>^ show
+                 , arr $ \i => #"Ignored invalid input: \#{show i}"#
+                 ]
+
+testUI : List String
+testUI = simulate $  replicate 11 Inc
+                  ++ replicate 2 Reset
+                  ++ replicate 11 Dec
+```
+
+And at the REPL:
+
+```
+Doc.UIEx1> testUI
+["MkUI { inc = True, dec = True, reset = True, out = "Count: 1" }",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: 2" }",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: 3" }",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: 4" }",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: 5" }",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: 6" }",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: 7" }",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: 8" }",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: 9" }",
+ "MkUI { inc = False, dec = True, reset = True, out = "Count: 10" }",
+ "Ignored invalid input: Inc",
+ "MkUI { inc = True, dec = True, reset = False, out = "Count: 0" }",
+ "Ignored invalid input: Reset",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: -1" }",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: -2" }",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: -3" }",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: -4" }",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: -5" }",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: -6" }",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: -7" }",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: -8" }",
+ "MkUI { inc = True, dec = True, reset = True, out = "Count: -9" }",
+ "MkUI { inc = True, dec = False, reset = True, out = "Count: -10" }",
+ "Ignored invalid input: Dec"]
 ```

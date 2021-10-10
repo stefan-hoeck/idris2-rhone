@@ -1,6 +1,8 @@
 module Data.MSF
 
 import Control.Monad.Identity
+import Control.Monad.Reader
+import Control.Monad.State
 import Data.List.Elem
 import Data.Maybe
 import Data.VectorSpace
@@ -222,40 +224,60 @@ collect : CollectList m is o -> MSF m (NS I is) o
 collect = Collect
 
 export
-either :  MSF m i1 o1
-       -> MSF m i2 o2
-       -> MSF m (Either i1 i2) (Either o1 o2)
-either sf1 sf2 =   either Z (S . Z)
-               ^>> choice [sf1,sf2]
-               >>^ collapseNS . hapNS [Left,Right]
+either : MSF m (Either i1 i2) (NS I [i1,i2])
+either = arr $ either Z (S . Z)
 
 export
-maybe :  MSF m i1 o1
-      -> MSF m () ()
-      -> MSF m (Maybe i1) (Maybe o1)
-maybe sf1 sf2 =   maybe (S $ Z ()) Z
-              ^>> choice [sf1,sf2]
-              >>^ collapseNS . hapNS [Just, const Nothing]
+ifLeft : Monoid o => MSF m i o -> MSF m (Either i a) o
+ifLeft sf = either >>> collect [sf, const neutral]
 
 export
-ifLeft : MSF m i o -> MSF m (Either i a) (Either o a)
-ifLeft sf = either sf id
+ifRight : Monoid o => MSF m i o -> MSF m (Either a i) o
+ifRight sf = either >>> collect [const neutral, sf]
 
 export
-ifRight : MSF m i o -> MSF m (Either a i) (Either a o)
-ifRight sf = either id sf
+maybe :  MSF m (Maybe i) (NS I [i,()])
+maybe = arr $ maybe (S $ Z ()) Z
 
 export
-ifJust : MSF m a b -> MSF m (Maybe a) (Maybe b)
-ifJust sf = maybe sf id
+ifJust : Monoid o => MSF m i o -> MSF m (Maybe i) o
+ifJust sf = maybe >>> collect [sf, const neutral]
 
 export
-ifNothing : MSF m () () -> MSF m (Maybe a) (Maybe a)
-ifNothing sf = maybe id sf
+ifNothing : Monoid o => MSF m () o -> MSF m (Maybe i) o
+ifNothing sf = maybe >>> collect [const neutral, sf]
 
 export
-ifTrue : (f : i -> Bool) -> MSF m i o -> MSF m i (Maybe o)
-ifTrue f sf = (\vi => toMaybe (f vi) vi) ^>> ifJust sf
+bool : (f : i -> Bool) -> MSF m i (NS I [i,i])
+bool f = arr $ \vi => if f vi then Z vi else (S $ Z vi)
+
+export
+ifTrue : Monoid o => (f : i -> Bool) -> MSF m i o -> MSF m i o
+ifTrue f sf = bool f >>> collect [sf, const neutral]
+
+export
+ifFalse : Monoid o => (f : i -> Bool) -> MSF m i o -> MSF m i o
+ifFalse f sf = bool f >>> collect [const neutral, sf]
+
+--------------------------------------------------------------------------------
+--          Transformer Utilities
+--------------------------------------------------------------------------------
+
+export %inline
+get : MonadState s m => MSF m i s
+get = arrM (const get)
+
+export %inline
+put : MonadState s m => MSF m s ()
+put = arrM put
+
+export %inline
+modify : MonadState s m => MSF m (s -> s) ()
+modify = arrM modify
+
+export %inline
+ask : MonadReader e m => MSF m i e
+ask = arrM (const ask)
 
 --------------------------------------------------------------------------------
 --          Interfaces
