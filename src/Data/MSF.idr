@@ -139,6 +139,11 @@ export %inline
 arrM : (i -> m o) -> MSF m i o
 arrM = Lifted
 
+||| Lifting an value in a context
+export %inline
+constM : m o -> MSF m i o
+constM = Lifted . const
+
 ||| Runs the given effectful computation on each input,
 ||| passing on the unmodified input afterwards.
 export %inline

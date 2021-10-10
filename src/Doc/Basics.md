@@ -4,7 +4,6 @@ This tutorial gives an introduction to monadic
 streaming functions (MSFs), providing examples of
 how to setup networks of such functions for defining
 reactive behaviors.
-
 Since I use MSFs mainly as an experimental tool to
 write reactive web pages in
 [idris2-rhone-js](https://github.com/stefan-hoeck/idris2-rhone-js),
@@ -31,12 +30,14 @@ To the best of my knowledge, MSFs have first been introduced
 in Haskell's [dunai](https://hackage.haskell.org/package/dunai)
 library. There is also a nice
 [article](https://www.cs.nott.ac.uk/~psxip1/#FRPRefactored)
-describing the concept MSFs and the general idea behind arrowized functional
-reactive programming (AFRP).
+describing the concept of MSFs and the general idea behind
+arrowized functional reactive programming (AFRP).
 I am not going to give an introduction to functional
 reactive programming and its semantic model here.
 I'd rather like to show what
 MSFs can be used for and how they work internally.
+However, I sometimes will pick a simple example from FRP
+to demonstrate a certain use case.
 
 An MSF can be thought of having the following structure
 (given in Haskell code, as this definition does not go well
@@ -62,23 +63,25 @@ They come with a plethora of combinators to describe
 networks of computations potentially taking their input 
 from many different sources.
 
-### The Implementaion used in rhone
+### The Implementaion used in *rhone*
 
 As mentioned above, the most general form of MSFs as defined
 in *dunai*, does not go well with the totality checker. On the
 other hand it is very useful to be able to write provably
 total networks of streaming functions. As is often the case
-in Haskell codes, the examples in the article mentioned above
-make strong use of (arbitrary) recursion and lazyness to set
-up interesting streaming networks. One has to be very careful
+in Haskell, the examples in the article mentioned above
+make strong use of (arbitrary) recursion and laziness to set
+up interesting and powerful streaming networks and
+programmers have to be very careful
 to not come up with an unsound MSF that will loop forver.
-It is my hope that Idris will prevent us from falling
-into the same trap.
+It is my hope that Idris and its totality checker
+will be able to safe us from falling into this trap most
+of the time.
 
 The actual implementation in `Data.MSF` is therefore a
 sum type consisting of several constructors, some
 of which define primitive operations, some of which are
-the because they let us handle typical use cases more
+there because they let us handle typical use cases more
 efficiently. However, there is still a function called `step`
 with exactly the expected type, but it is used for
 single step evaluation of a streaming function not for
@@ -122,8 +125,11 @@ abstract over the effectful computations in order to be able
 to try this at the REPL):
 
 ```idris
+square : Num n => n -> n
+square x = x * x
+
 calc : m Nat -> (String -> m ()) -> MSF m () ()
-calc fetch pr = arrM (const fetch) >>> (\x => x*x) ^>> show ^>> arrM pr
+calc fetch pr = constM fetch >>> square ^>> show ^>> arrM pr
 ```
 
 We can run this at the REPL, but if we just use `Identity`
@@ -321,7 +327,7 @@ integral_ : MSF m (NP I [Double,DTime]) Double
 integral_ = feedback 0 . arr $ \([v,dt],acc) => dup (acc + v * cast dt)
 ```
 
-The above uses the `feedback` primitive directly. However, nn this case it
+The above uses the `feedback` primitive directly. However, in this case it
 is more convenient, to use `accumulateWith`:
 
 ```idris
