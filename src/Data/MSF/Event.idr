@@ -1,4 +1,4 @@
-module Data.Event
+module Data.MSF.Event
 
 %default total
 

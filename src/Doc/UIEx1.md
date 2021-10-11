@@ -102,7 +102,7 @@ purposes:
 
 ```idris
 onInput : MSF (State UI) Input (NS I [Ev,Input])
-onInput = fan [get, id] >>> bool valid >>> choice [arr toFun, arr snd]
+onInput = fan [get, id] >>> bool valid >>> choice [arr toFun, snd]
   where valid : NP I [UI,Input] -> Bool
         valid [ui,Inc]   = ui.inc
         valid [ui,Dec]   = ui.dec

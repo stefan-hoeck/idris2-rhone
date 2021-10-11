@@ -1,9 +1,16 @@
-package rhone-doc
+package rhone
 version    = 0.0.1
 authors    = "Stefan Höck"
 depends    = base    >= 0.5.1
            , sop     >= 0.5.0
 
-modules    = Doc.Basics
+modules    = Data.MSF
+           , Data.MSF.Core
+           , Data.MSF.Event
+           , Data.MSF.Running
+           , Data.MSF.Switch
+           , Data.MSF.Trans
+
+           , Data.VectorSpace
 
 sourcedir  = "src"

@@ -1,4 +1,4 @@
-package rhone
+package rhone-doc
 version    = 0.0.1
 authors    = "Stefan Höck"
 depends    = base      >= 0.5.1

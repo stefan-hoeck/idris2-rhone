@@ -364,7 +364,7 @@ record Ball where
 
 ball : (ini : Ball) -> MSF m DTime Ball
 ball ini =   fan [fan [const g, id] >>> velocity ini.vel, id]
-         >>> fan [position ini.pos, arr fst]
+         >>> fan [position ini.pos, hd]
          >>^ (\[p,v] => MkBall p v)
 
 ballGame : (ini : Ball) -> MSF m DTime String
