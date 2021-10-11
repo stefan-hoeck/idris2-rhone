@@ -204,9 +204,9 @@ toColor Mdl = "green"
 
 mouse : (log : String -> m ()) -> MSF m (NP I [Int16,Int16,Button]) String
 mouse log =
-  par [ observeWith (arrM $ \x => log #"x: \#{show x}"#) >>^ (*2)
-      , observeWith (arrM $ \y => log #"y: \#{show y}"#) >>^ (+10)
-      , observeWith (arrM $ log . show) >>^ toColor
+  par [ withEffect (\x => log #"x: \#{show x}"#) >>^ (*2)
+      , withEffect (\y => log #"y: \#{show y}"#) >>^ (+10)
+      , withEffect (log . show) >>^ toColor
       ] >>^ (\[x,y,c] => #"x: \#{show x}, y: \#{show y}, c: \#{c}"#)
 
 runMouse : List (NP I [Int16,Int16,Button]) -> (AppSt, List String)
@@ -232,7 +232,7 @@ toFahrenheit x = x * 9 / 5 - 459.67
 
 temp : (log : String -> m ()) -> MSF m Double String
 temp log =
-  fan [ observeWith . arrM $ log . show
+  fan [ withEffect (log . show)
       , arr toCelsius
       , arr toFahrenheit ] >>^
   (\[k,c,f] => #"\#{show k} K, \#{show c} °C, \#{show f} °F"#)
@@ -277,9 +277,9 @@ record Input where
 events :  (out : String -> m ())
        -> MSF m (NS I [MouseClick,Key,Input]) (NS I [Button,Char,String])
 events out = choice
-  [ observeWith (arrM $ out . show) >>^ btn
-  , observeWith (arrM $ out . show) >>^ c
-  , observeWith (arrM $ out . show) >>^ value
+  [ withEffect (out . show) >>^ btn
+  , withEffect (out . show) >>^ c
+  , withEffect (out . show) >>^ value
   ]
 
 eventsExample : (AppSt, List (NS I [Button,Char,String]))
@@ -324,7 +324,7 @@ of time-varying entities:
 
 ```idris
 integral_ : MSF m (NP I [Double,DTime]) Double
-integral_ = feedback 0 . arr $ \([v,dt],acc) => dup (acc + v * cast dt)
+integral_ = feedback 0 $ arr (\([v,dt],acc) => dup (acc + v * cast dt))
 ```
 
 The above uses the `feedback` primitive directly. However, in this case it

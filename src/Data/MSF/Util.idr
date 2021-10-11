@@ -2,6 +2,7 @@
 module Data.MSF.Util
 
 import Data.MSF.Core
+import Data.MSF.Event
 import Data.SOP
 
 --------------------------------------------------------------------------------
@@ -9,6 +10,10 @@ import Data.SOP
 --------------------------------------------------------------------------------
 
 infixr 1 >>^, ^>>, >>!, !>>
+
+export %inline
+(.) : MSF m x o -> MSF m i x -> MSF m i o
+sf2 . sf1 = Seq sf1 sf2
 
 ||| Sequencing of an MSF and a pure function
 export %inline
@@ -185,3 +190,79 @@ repeatedly f = unfold $ dup . f
 export
 observeWith : MSF m i o -> MSF m i i
 observeWith sf = fan [id,sf] >>> hd
+
+export %inline
+withEffect : (i -> m ()) -> MSF m i i
+withEffect = observeWith . arrM
+
+export %inline
+runEffect : m () -> MSF m i i
+runEffect = withEffect . const
+
+--------------------------------------------------------------------------------
+--          Event Streams
+--------------------------------------------------------------------------------
+
+export
+never : MSF m i (Event o)
+never = const NoEv
+
+export
+hold : o -> MSF m (Event o) o
+hold = accumulateWith (\ev,v => fromEvent v ev)
+
+export
+once : o -> MSF m i (Event o)
+once v = DSwitch (const $ Left ((),Ev v)) (const never)
+
+export
+when : (i -> Bool) -> MSF m i (Event i)
+when f = arr $ \vi => toEvent (f vi) vi
+
+export
+when_ : (i -> Bool) -> MSF m i (Event ())
+when_ f = arr $ \vi => toEvent (f vi) ()
+
+export
+whenLeft : MSF m (Either a b) (Event a)
+whenLeft = arr $ either Ev (const NoEv)
+
+export
+whenRight : MSF m (Either a b) (Event b)
+whenRight = arr $ either (const NoEv) Ev
+
+export
+whenJust : MSF m (Maybe a) (Event a)
+whenJust = arr maybeToEvent
+
+export
+whenNothing : MSF m (Maybe a) (Event ())
+whenNothing = arr $ maybe (Ev ()) (const NoEv)
+
+||| Convert an `Event` input to a binary sum, which
+||| can then be sequenced with a call to `choice` or `collect`.
+export
+event :  MSF m (Event i) (NS I [i,()])
+event = arr $ event (S $ Z ()) Z
+
+||| Run the given MSF only if the input fired an event.
+export
+ifEvent : Monoid o => MSF m i o -> MSF m (Event i) o
+ifEvent sf = event >>> collect [sf, const neutral]
+
+||| Run the given MSF only if the input fired an event.
+export
+ifNoEvent : Monoid o => MSF m () o -> MSF m (Event i) o
+ifNoEvent sf = event >>> collect [const neutral, sf]
+
+export
+onChange : Eq o => MSF m o (Event o)
+onChange = mealy accum  NoEv
+  where accum : o -> Event o -> (Event o, Event o)
+        accum v old =
+          let ev = Ev v
+           in if ev == old then (NoEv, old) else (ev,ev)
+
+export
+(<|>) : MSF m i (Event o) -> MSF m i (Event o) -> MSF m i (Event o)
+(<|>) = elementwise2 (\e1,e2 => e1 <|> e2)

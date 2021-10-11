@@ -42,8 +42,16 @@ unReader : Monad m => MSF (ReaderT e m) i o -> MSF m (NP I [e,i]) o
 unReader = morphGS (\f,[ve,vi] => runReaderT ve (f vi))
 
 export
+unReader_ : Monad m => MSF (ReaderT e m) () o -> MSF m e o
+unReader_ = morphGS (\f,ve => runReaderT ve (f ()))
+
+export
 withReader : Monad m => MSF m (NP I [e,i]) o -> MSF (ReaderT e m) i o
 withReader = morphGS (\f,vi => MkReaderT $ \ve => f [ve,vi])
+
+export
+withReader_ : Monad m => MSF m e o -> MSF (ReaderT e m) () o
+withReader_ = morphGS (\f,_ => MkReaderT f)
 
 --------------------------------------------------------------------------------
 --          State
@@ -102,6 +110,15 @@ unWriter : Monoid w => Monad m => MSF (WriterT w m) i o -> MSF m i (o,w)
 unWriter = morphGS (\f,vi => (\((x,y),z) => ((x,z),y)) <$> runWriterT (f vi))
 
 export
+unWriter_ : Monoid w => Monad m => MSF (WriterT w m) i () -> MSF m i w
+unWriter_ = morphGS (\f,vi => (\((_,y),z) => (z,y)) <$> runWriterT (f vi))
+
+export
 withWriter : Semigroup w => Monad m => MSF m i (o,w) -> MSF (WriterT w m) i o
 withWriter =
   morphGS (\f,vi => MkWriterT $ \vw => (\((a,b),c) => ((a,c),vw <+> b)) <$> f vi)
+
+export
+withWriter_ : Semigroup w => Monad m => MSF m i w -> MSF (WriterT w m) i ()
+withWriter_ =
+  morphGS (\f,vi => MkWriterT $ \vw => (\(b,c) => (((),c),vw <+> b)) <$> f vi)

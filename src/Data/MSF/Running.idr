@@ -85,15 +85,15 @@ mutual
     (o, msf2) <- f (step msf) v
     pure (o, Morph f msf2)
 
--- step i (Switch sf f) = do
---   ((o,Ev e),_) <- step i sf
---     | ((o,NoEv),sf2) => pure (o, Switch sf2 f)
---   step i $ f e
--- 
--- step i (DSwitch sf f) = do
---   ((o,Ev e),_) <- step i sf
---     | ((o,NoEv),sf2) => pure (o, DSwitch sf2 f)
---   pure (o, f e)
+  step (Switch sf f) i = do
+    (Left e,_) <- step sf i
+      | (Right o,sf2) => pure (o, Switch sf2 f)
+    step (f e) i
+  
+  step (DSwitch sf f) i = do
+    (Left(e, o),_) <- step sf i
+      | (Right o,sf2) => pure (o, DSwitch sf2 f)
+    pure (o, f e)
 
 --------------------------------------------------------------------------------
 --          Running MSFs

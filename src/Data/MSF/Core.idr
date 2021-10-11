@@ -125,19 +125,19 @@ mutual
               -> MSF m1 a1 b1
               -> MSF m2 a2 b2
   
-  --   ||| Single time switching: Upon the first event,
-  --   ||| the second streaming function is calculated,
-  --   ||| evaluated immediately and used henceforth.
-  --   Switch    :  MSF m i (o, Event e) -> (e -> MSF m i o) -> MSF m i o
-  -- 
-  --   ||| Single time delayed switiching: Upon the first event,
-  --   ||| the second streaming function is generated but the
-  --   ||| former output is returned. The freshly 
-  --   ||| generated streaming function is used in all future
-  --   ||| evaluation steps.
-  --   |||
-  --   ||| It is safe to use this in arbitrary recursive calls.
-  --   DSwitch   :  MSF m i (o, Event e) -> Inf (e -> MSF m i o) -> MSF m i o
+    ||| Single time switching: Upon the first event,
+    ||| the second streaming function is calculated,
+    ||| evaluated immediately and used henceforth.
+    Switch    :  MSF m i (Either e o) -> (e -> MSF m i o) -> MSF m i o
+  
+    ||| Single time delayed switiching: Upon the first event,
+    ||| the second streaming function is generated but the
+    ||| former output is returned. The freshly 
+    ||| generated streaming function is used in all future
+    ||| evaluation steps.
+    |||
+    ||| It is safe to use this in arbitrary recursive calls.
+    DSwitch   :  MSF m i (Either (e,o) o) -> Inf (e -> MSF m i o) -> MSF m i o
 
 --------------------------------------------------------------------------------
 --          Lifting Primitives
