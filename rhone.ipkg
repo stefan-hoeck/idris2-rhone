@@ -4,7 +4,9 @@ authors    = "Stefan Höck"
 depends    = base    >= 0.5.1
            , sop     >= 0.5.0
 
-modules    = Data.MSF
+modules    = Control.Applicative.Syntax
+
+           , Data.MSF
            , Data.MSF.Core
            , Data.MSF.Event
            , Data.MSF.Running
