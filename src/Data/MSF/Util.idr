@@ -1,6 +1,7 @@
 ||| Various utility combinators
 module Data.MSF.Util
 
+import Data.List
 import Data.MSF.Core
 import Data.MSF.Event
 import Data.SOP
@@ -191,6 +192,14 @@ unfold f ini = feedback ini (arr $ f . hd)
 export
 repeatedly : (o -> o) -> o -> MSF m i o
 repeatedly f = unfold $ \vo => let vo2 = f vo in [vo2,vo2]
+
+||| Cycles through the given non-empty vector of values.
+export
+cycle : (vs : List o) -> {auto 0 prf : NonEmpty vs} -> MSF m i o
+cycle (h :: t) = unfold next (h :: t)
+  where next : List o -> NP I [List o, o]
+        next Nil        = [t,h]
+        next (h' :: t') = [t',h']
 
 --------------------------------------------------------------------------------
 --          Observing Streaming Functions
