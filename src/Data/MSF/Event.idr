@@ -1,4 +1,4 @@
-module Data.Event
+module Data.MSF.Event
 
 %default total
 
@@ -27,6 +27,11 @@ fromEvent x NoEv   = x
 fromEvent _ (Ev v) = v
 
 public export
+toEvent : Bool -> Lazy a -> Event a
+toEvent False _  = NoEv
+toEvent True  va = Ev va
+
+public export
 event : Lazy b -> Lazy (a -> b) -> Event a -> b
 event v _ NoEv   = v
 event _ f (Ev x) = f x
@@ -49,6 +54,11 @@ unionWith _ x      y      = unionL x y
 --------------------------------------------------------------------------------
 --          Interface Implementations
 --------------------------------------------------------------------------------
+
+export
+Show a => Show (Event a) where
+  showPrec p NoEv   = "NoEv"
+  showPrec p (Ev v) = showCon p "Ev" $ showArg v
 
 public export
 Eq a => Eq (Event a) where

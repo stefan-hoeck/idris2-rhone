@@ -2,11 +2,17 @@ package rhone
 version    = 0.0.1
 authors    = "Stefan Höck"
 depends    = base    >= 0.5.1
-           , contrib >= 0.5.1
+           , sop     >= 0.5.0
 
-modules    = Data.Event
-           , Data.MES
+modules    = Control.Applicative.Syntax
+
            , Data.MSF
+           , Data.MSF.Core
+           , Data.MSF.Event
+           , Data.MSF.Running
+           , Data.MSF.Switch
+           , Data.MSF.Trans
+
            , Data.VectorSpace
 
 sourcedir  = "src"

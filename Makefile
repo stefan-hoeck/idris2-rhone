@@ -1,17 +1,23 @@
 export IDRIS2 ?= idris2
 
+doc_pkg = doc.ipkg
+
 lib_pkg = rhone.ipkg
 
 test_pkg = test.ipkg
 
 .PHONY: all
-all: lib test
+all: lib doc test
 
 .PHONY: clean-install
 clean-install: clean install
 
 .PHONY: clean-install-with-src
 clean-install-with-src: clean install
+
+.PHONY: doc
+doc:
+	${IDRIS2} --build ${doc_pkg}
 
 .PHONY: lib
 lib:
@@ -38,3 +44,7 @@ clean:
 .PHONY: develop
 develop:
 	find -name "*.idr" | entr -d idris2 --typecheck ${lib_pkg}
+
+.PHONY: develop-doc
+develop-doc:
+	find -regextype posix-extended -regex ".*\.(idr|md)" | entr -d idris2 --typecheck ${doc_pkg}

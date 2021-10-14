@@ -8,18 +8,6 @@ import Hedgehog
 
 %default total
 
-export
-embed : Monad m => List i  -> MSF m i o -> m (List o)
-embed [] _          = pure []
-embed (vi :: is) sf = do
-  (vo,sf2) <- step vi sf
-  os       <- embed is sf2
-  pure $ vo :: os
-
-export
-embedI : List i  -> MSF Identity i o -> List o
-embedI is = runIdentity . embed is
-
 --------------------------------------------------------------------------------
 --          Generators
 --------------------------------------------------------------------------------
@@ -52,7 +40,7 @@ prop_arr = property $ do
 prop_elementwise : Property
 prop_elementwise = property $ do
   [n1,n2,ns] <- forAll $ np [smallInt,smallInt,smallInts]
-  embedI ns (elementwise (*n1) (arr (+n2))) ===
+  embedI ns (map (*n1) (arr (+n2))) ===
     map (\n => n1 * (n + n2)) ns
 
 prop_elementwise2 : Property
@@ -60,6 +48,22 @@ prop_elementwise2 = property $ do
   [n1,n2,ns] <- forAll $ np [smallInt,smallInt,smallInts]
   embedI ns [| arr (+n1) * arr (+n2) |] ===
   zipWith (*) (map (+n1) ns) (map (+n2) ns)
+
+prop_once : Property
+prop_once = property $ do
+  [n1,n2,ns] <- forAll $ np [smallInt,smallInt,smallInts]
+  embedI (n2 :: ns) (once n1) === Ev n1 :: (ns $> NoEv)
+
+prop_onceOrId : Property
+prop_onceOrId = property $ do
+  [n1,n2,ns] <- forAll $ np [smallInt,smallInt,smallInts]
+  embedI (map Ev $ n2 :: ns) (once n1 <|> id) === Ev n1 :: map Ev ns
+
+prop_idOrOnce : Property
+prop_idOrOnce = property $ do
+  [n1,n2,ns] <- forAll $ np [smallInt,smallInt,smallInts]
+  embedI (map Ev $ n2 :: ns) (id <|> once n1) === Ev n2 :: map Ev ns
+  embedI (NoEv :: map Ev ns) (id <|> once n1) === Ev n1 :: map Ev ns
 
 --------------------------------------------------------------------------------
 --          props
@@ -73,4 +77,6 @@ props = MkGroup "basic properties"
           , ("prop_arr", prop_arr)
           , ("prop_elementwise", prop_elementwise)
           , ("prop_elementwise2", prop_elementwise2)
+          , ("prop_once", prop_once)
+          , ("idOrOnce", prop_idOrOnce)
           ]
