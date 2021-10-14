@@ -1,7 +1,7 @@
-# An Introduction to Monadic Streaming Functions
+# An Introduction to Monadic Stream Functions
 
 This tutorial gives an introduction to monadic
-streaming functions (MSFs), providing examples of
+stream functions (MSFs), providing examples of
 how to setup networks of such functions for defining
 reactive behaviors.
 Since I use MSFs mainly as an experimental tool to
@@ -52,7 +52,7 @@ although `step` is called `unMSF` there. What this does
 is the following: It takes a value of an input type `a`
 runs an effectful computation in monadic context `m`,
 and returns a result of type `b` together with a new
-monadic streaming function, which will then be used to
+monadic stream function, which will then be used to
 process the next piece of input.
 
 So MSFs describe effectful computations *the structure of
@@ -68,10 +68,10 @@ from many different sources.
 As mentioned above, the most general form of MSFs as defined
 in *dunai*, does not go well with the totality checker. On the
 other hand it is very useful to be able to write provably
-total networks of streaming functions. As is often the case
+total networks of stream functions. As is often the case
 in Haskell, the examples in the article mentioned above
 make strong use of (arbitrary) recursion and laziness to set
-up interesting and powerful streaming networks and
+up interesting and powerful stream networks and
 programmers have to be very careful
 to not come up with an unsound MSF that will loop forver.
 It is my hope that Idris and its totality checker
@@ -84,7 +84,7 @@ of which define primitive operations, some of which are
 there because they let us handle typical use cases more
 efficiently. However, there is still a function called `step`
 with exactly the expected type, but it is used for
-single step evaluation of a streaming function not for
+single step evaluation of a stream function not for
 their actual internal representation.
 
 There are some other deviations from *dunai* more specific to Idris
@@ -103,7 +103,7 @@ rlwrap idris2 --find-ipkg src/Doc/Basics.md
 ```
 
 and invoke `embedI` with a list of input values and a
-streaming function:
+stream function:
 
 ```
 Doc.Basics> embedI ["foo", "bar"] (arr Prelude.reverse)
@@ -170,7 +170,7 @@ MkAppSt 4 ["16", "9", "4", "1"]
 ## Static Networks: Parallelisation and Broadcasting
 
 A typical use case consists of collecting input from several sources,
-passing them through distinct streaming networks and collecting
+passing them through distinct stream networks and collecting
 the results afterwards. For instance, consider an application
 collecting mouse clicks: Their x and y coordinates plus the
 button clicked. We'd like to transform each piece of data differently:
@@ -188,7 +188,7 @@ have such an extension. What we do have, though, is great support for
 list syntax and the ability to easily make use of type-level
 computations. We therefore use a special heterogeneous
 list type `Data.MSF.MSFList` for defining lists of
-monadic streaming functions and run them in parallel.
+monadic stream functions and run them in parallel.
 Instead of pairs, we use the n-ary products from the *sop*
 library as the resulting input and output types.
 
@@ -214,7 +214,7 @@ runMouse ps = runState ini $ embed ps (mouse putStr)
 ```
 
 Another typical use case is to broadcast some input common
-to several streaming functions to all of them and collect
+to several stream functions to all of them and collect
 the result in a product type. The classical way to do this
 is by using the `(&&&)` operator. In Idris, we can again use a
 (heterogeneous) list type for this: `Data.MSF.FanList`.
@@ -244,7 +244,7 @@ runTemp vs = runState ini $ embed vs (temp putStr)
 ## Making a Choice: Using Sum Types to select MSFs
 
 We sometimes need to choose between two or more
-streaming functions, depending on an input value.
+stream functions, depending on an input value.
 The canonical example is to make a choice based
 on `Left` or `Right`, leading to a result, which
 is again `Left` or `Right`. This can again be generalized

@@ -405,7 +405,7 @@ aliasIn = arr (inputFor FAlias) <|> once ""
 ```
 
 While this would behave correctly, we'd still need to invoke
-`hold` with an initial value to get a proper streaming function
+`hold` with an initial value to get a proper stream function
 to build a validated `Account` value from the collected
 text field contents. This would again lead to a repetition
 of application logic. An alternative comes in form of
@@ -427,11 +427,11 @@ fireAndHold v = fan [hold v, id <|> once v]
 ```
 
 This combinator takes an event stream and passes it an initial
-value converting it to both, a streaming function as well as a new
+value converting it to both, a stream function as well as a new
 event stream, which is guaranteed to fire an event at the
 first evaluation step.
 
-We can now extract a `Maybe b` from the resulting streaming
+We can now extract a `Maybe b` from the resulting stream
 function, while using the event stream for sending
 validation info to the UI whenever the content of
 the text field in question changed:
