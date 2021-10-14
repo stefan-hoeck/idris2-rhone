@@ -234,6 +234,16 @@ export
 when_ : (i -> Bool) -> MSF m i (Event ())
 when_ f = arr $ \vi => toEvent (f vi) ()
 
+||| Fire an event whenever the input equals the given value.
+export
+is : Eq i => i -> MSF m i (Event ())
+is v = when_ (v ==)
+
+||| Fire an event whenever the input does not equal the given value.
+export
+isNot : Eq i => i -> MSF m i (Event ())
+isNot v = when_ (v /=)
+
 ||| Fire an event if the input is a `Left`.
 export
 whenLeft : MSF m (Either a b) (Event a)
