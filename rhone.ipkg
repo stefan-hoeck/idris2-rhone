@@ -12,6 +12,7 @@ modules    = Control.Applicative.Syntax
            , Data.MSF.Running
            , Data.MSF.Switch
            , Data.MSF.Trans
+           , Data.MSF.Util
 
            , Data.VectorSpace
 
