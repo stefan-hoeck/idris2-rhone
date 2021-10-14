@@ -78,7 +78,7 @@ mutual
   step (Collect sfs) v = mapSnd Collect <$> stepCollect sfs v
 
   step (Loop s sf) v = do
-    ((o,s2), sf2) <- step sf (v,s)
+    ([s2,o], sf2) <- step sf [s,v]
     pure (o, Loop s2 sf2)
   
   step (Morph f msf) v = do
@@ -94,6 +94,10 @@ mutual
     (Left(e, o),_) <- step sf i
       | (Right o,sf2) => pure (o, DSwitch sf2 f)
     pure (o, f e)
+  
+  step (Freeze sf) i = do
+    (o,sf2) <- step sf i
+    pure ([sf2,o], Freeze sf2)
 
 --------------------------------------------------------------------------------
 --          Running MSFs

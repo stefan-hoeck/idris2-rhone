@@ -116,7 +116,7 @@ mutual
     Collect   :  CollectList m is o -> MSF m (NS I is) o
   
     ||| Feedback loops (stateful computations)
-    Loop      :  s -> MSF m (i, s) (o, s) -> MSF m i o
+    Loop      :  s -> MSF m (NP I [s, i]) (NP I [s, o]) -> MSF m i o
   
     ||| Changes the context of an MSF without affecting
     ||| its internal structure (the wiring remains the same)
@@ -138,6 +138,8 @@ mutual
     |||
     ||| It is safe to use this in arbitrary recursive calls.
     DSwitch   :  MSF m i (Either (e,o) o) -> Inf (e -> MSF m i o) -> MSF m i o
+
+    Freeze : MSF m i o -> MSF m i (NP I [MSF m i o, o])
 
 --------------------------------------------------------------------------------
 --          Lifting Primitives
@@ -226,7 +228,7 @@ collect = Collect
 ||| we can feedback the result of each evaluation
 ||| step and us it as the new state for the next step.
 export %inline
-feedback : s -> MSF m (i, s) (o, s) -> MSF m i o
+feedback : s -> MSF m (NP I [s,i]) (NP I [s,o]) -> MSF m i o
 feedback = Loop
 
 --------------------------------------------------------------------------------

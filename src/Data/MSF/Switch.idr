@@ -32,3 +32,21 @@ switchWhen sf ev =
 export %inline
 dswitch : MSF m i (Either (e,o) o) -> Inf (e -> MSF m i o) -> MSF m i o
 dswitch = DSwitch
+
+||| Produces output of the first MSF until the second
+||| fires an event, in which case a new MSF is created,
+||| which will evaluated immediately and used henceforth.
+export
+rswitchWhen :  MSF m i o
+            -> MSF m i (Event e)
+            -> (e -> MSF m i o)
+            -> MSF m i o
+rswitchWhen ini es f =
+  dswitch (fan [ini, Freeze es] >>^ next) cont
+  where next :  NP I [o,NP I [MSF m i (Event e), Event e]]
+             -> Either (NP I [MSF m i (Event e), e],o) o
+        next [vo,[_,NoEv]]   = Right vo
+        next [vo,[sf,Ev ve]] = Left ([sf,ve],vo)
+
+        cont : NP I [MSF m i (Event e), e] -> MSF m i o
+        cont [sf,ve] = rswitchWhen (f ve) sf f

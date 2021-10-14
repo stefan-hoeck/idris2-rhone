@@ -324,7 +324,8 @@ of time-varying entities:
 
 ```idris
 integral_ : MSF m (NP I [Double,DTime]) Double
-integral_ = feedback 0 $ arr (\([v,dt],acc) => dup (acc + v * cast dt))
+integral_ =
+  feedback 0 $ arr (\[acc,[v,dt]] => let a2 = acc + v * cast dt in [a2,a2])
 ```
 
 The above uses the `feedback` primitive directly. However, in this case it

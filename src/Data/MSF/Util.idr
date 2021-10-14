@@ -131,6 +131,16 @@ export
 ifFalse : Monoid o => (f : i -> Bool) -> MSF m i o -> MSF m i o
 ifFalse f sf = bool f >>> collect [const neutral, sf]
 
+||| Run the given MSF only if the input equlas the given value
+export
+ifIs : Eq i => Monoid o => (v : i) -> MSF m i o -> MSF m i o
+ifIs v = ifTrue (v ==)
+
+||| Run the given MSF only if the input does not equal the given value
+export
+ifIsNot : Eq i => Monoid o => (v : i) -> MSF m i o -> MSF m i o
+ifIsNot v = ifFalse (v ==)
+
 --------------------------------------------------------------------------------
 --          Looping Utilities
 --------------------------------------------------------------------------------
@@ -138,15 +148,15 @@ ifFalse f sf = bool f >>> collect [const neutral, sf]
 ||| Delay a stream by one sample.
 export %inline
 iPre : o -> MSF m o o
-iPre v = feedback v (arr $ \(new,delayed) => (delayed,new))
+iPre v = feedback v (arr $ \[delayed,new] => [new,delayed])
 
 ||| Applies a function to the input and an accumulator,
 ||| outputting the updated accumulator.
 export
 accumulateWith : (i -> o -> o) -> o -> MSF m i o
 accumulateWith f ini = feedback ini (arr g)
-  where g : (i,o) -> (o,o)
-        g (inp,acc) = let acc' = f inp acc in (acc',acc')
+  where g : NP I [o,i] -> NP I [o,o]
+        g [acc,inp] = let acc' = f inp acc in [acc',acc']
 
 ||| Counts the number of scans of the signal function.
 export
@@ -166,21 +176,21 @@ append = appendFrom neutral
 ||| Applies a transfer function to the input and an accumulator,
 ||| returning the updated accumulator and output.
 export
-mealy : (i -> s -> (o, s)) -> s -> MSF m i o
-mealy f s0 = feedback s0 $ arr (uncurry f)
+mealy : (i -> s -> NP I [s,o]) -> s -> MSF m i o
+mealy f s0 = feedback s0 (arr $ \[s,i] => f i s)
 
 ||| Unfolds a function over an initial state
 ||| value.
 export
-unfold : (s -> (o, s)) -> s -> MSF m i o
-unfold f ini = feedback ini (arr $ f . snd)
+unfold : (s -> NP I [s,o]) -> s -> MSF m i o
+unfold f ini = feedback ini (arr $ f . hd)
 
 ||| Generates output using a step-wise generation function and an initial
 ||| value. Version of 'unfold' in which the output and the new accumulator
 ||| are the same.
 export
 repeatedly : (o -> o) -> o -> MSF m i o
-repeatedly f = unfold $ dup . f
+repeatedly f = unfold $ \vo => let vo2 = f vo in [vo2,vo2]
 
 --------------------------------------------------------------------------------
 --          Observing Streaming Functions
@@ -285,10 +295,10 @@ ifNoEvent sf = event >>> collect [const neutral, sf]
 export
 onChange : Eq i => MSF m i (Event i)
 onChange = mealy accum  NoEv
-  where accum : i -> Event i -> (Event i, Event i)
+  where accum : i -> Event i -> NP I [Event i, Event i]
         accum v old =
           let ev = Ev v
-           in if ev == old then (NoEv, old) else (ev,ev)
+           in if ev == old then [old,NoEv] else [ev,ev]
 
 ||| Left-biased union of event streams: Fires an event
 ||| whenever either of the event streams fires an event.
@@ -333,3 +343,7 @@ export
 justOnEvent : MSF m (NP I [Maybe a, Event e]) (Event a)
 justOnEvent = arr $ \case [Just va,e] => e $> va
                           _           => NoEv
+
+export
+countE : MSF m (Event i) Nat
+countE = accumulateWith (\e,n => event n (const $ n + 1) e) 0
