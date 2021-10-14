@@ -1,4 +1,4 @@
-||| Provides a data type for Monadic Streaming Functions (MSFs)
+||| Provides a data type for Monadic Stream Functions (MSFs)
 ||| together with associated interface implementations and
 ||| some core functionality.
 |||
@@ -63,7 +63,7 @@ mutual
            -> (sfs : CollectList m is o)
            -> CollectList m (i :: is) o
 
-  ||| A monadic streaming function (`MSF`) is used to
+  ||| A monadic stream function (`MSF`) is used to
   ||| convert streams of input values of type `i` to
   ||| output values of type `o` in a monadic context `m`.
   |||
@@ -126,14 +126,14 @@ mutual
               -> MSF m2 a2 b2
   
     ||| Single time switching: Upon the first event,
-    ||| the second streaming function is calculated,
+    ||| the second stream function is calculated,
     ||| evaluated immediately and used henceforth.
     Switch    :  MSF m i (Either e o) -> (e -> MSF m i o) -> MSF m i o
   
     ||| Single time delayed switiching: Upon the first event,
-    ||| the second streaming function is generated but the
+    ||| the second stream function is generated but the
     ||| former output is returned. The freshly 
-    ||| generated streaming function is used in all future
+    ||| generated stream function is used in all future
     ||| evaluation steps.
     |||
     ||| It is safe to use this in arbitrary recursive calls.
