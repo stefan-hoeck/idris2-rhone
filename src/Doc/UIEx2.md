@@ -284,8 +284,8 @@ clicked and all text fields contain valid input.
 
 ```idris
 onSubmit : MonadUI m => MSF m Ev (Maybe Account) -> MSF m Ev ()
-onSubmit sf =   fan [when_ isSubmit, sf]
-            >>> arr (\[e,m] => e >> maybeToEvent m)
+onSubmit sf =   fan [sf, when_ isSubmit]
+            >>> justOnEvent
             >>> ifEvent (arrM submit)
 ```
 

@@ -11,6 +11,7 @@ import Data.SOP
 
 infixr 1 >>^, ^>>, >>!, !>>
 
+||| Reverse sequenceing of MSFs
 export %inline
 (.) : MSF m x o -> MSF m i x -> MSF m i o
 sf2 . sf1 = Seq sf1 sf2
@@ -72,7 +73,7 @@ export
 tl : MSF m (NP I (i :: t)) (NP I t)
 tl = arr tl
 
-||| Extract the tail of an n-ary product
+||| Extract the second value of an n-ary product
 export
 snd : MSF m (NP I (i :: i2 :: t)) i2
 snd = arr $ \(_ :: v :: _) => v
@@ -120,7 +121,7 @@ export
 bool : (f : i -> Bool) -> MSF m i (NS I [i,i])
 bool f = arr $ \vi => if f vi then Z vi else (S $ Z vi)
 
-||| Run the given MSF only if the predicate hold for the input.
+||| Run the given MSF only if the predicate holds for the input.
 export
 ifTrue : Monoid o => (f : i -> Bool) -> MSF m i o -> MSF m i o
 ifTrue f sf = bool f >>> collect [sf, const neutral]
@@ -191,10 +192,12 @@ export
 observeWith : MSF m i o -> MSF m i i
 observeWith sf = fan [id,sf] >>> hd
 
+||| Run the given effectful computation on each input.
 export %inline
 withEffect : (i -> m ()) -> MSF m i i
 withEffect = observeWith . arrM
 
+||| Run the given monadic action on each input.
 export %inline
 runEffect : m () -> MSF m i i
 runEffect = withEffect . const
@@ -203,38 +206,50 @@ runEffect = withEffect . const
 --          Event Streams
 --------------------------------------------------------------------------------
 
+||| The empty event stream that never fires an event
 export
 never : MSF m i (Event o)
 never = const NoEv
 
+||| Convert an event stream to a streaming function
+||| holding the value of the last event fired starting
+||| from the given initial value.
 export
 hold : o -> MSF m (Event o) o
 hold = accumulateWith (\ev,v => fromEvent v ev)
 
+||| Fire the given event exactly once on the first
+||| evaluation step.
 export
 once : o -> MSF m i (Event o)
 once v = DSwitch (const $ Left ((),Ev v)) (const never)
 
+||| Fire an event whenever the given predicate holds.
 export
 when : (i -> Bool) -> MSF m i (Event i)
 when f = arr $ \vi => toEvent (f vi) vi
 
+||| Like `when` but discard the input.
 export
 when_ : (i -> Bool) -> MSF m i (Event ())
 when_ f = arr $ \vi => toEvent (f vi) ()
 
+||| Fire an event if the input is a `Left`.
 export
 whenLeft : MSF m (Either a b) (Event a)
 whenLeft = arr $ either Ev (const NoEv)
 
+||| Fire an event if the input is a `Right`.
 export
 whenRight : MSF m (Either a b) (Event b)
 whenRight = arr $ either (const NoEv) Ev
 
+||| Fire an event if the input is a `Just`.
 export
 whenJust : MSF m (Maybe a) (Event a)
 whenJust = arr maybeToEvent
 
+||| Fire an event if the input is a `Nothing`.
 export
 whenNothing : MSF m (Maybe a) (Event ())
 whenNothing = arr $ maybe (Ev ()) (const NoEv)
@@ -250,19 +265,61 @@ export
 ifEvent : Monoid o => MSF m i o -> MSF m (Event i) o
 ifEvent sf = event >>> collect [sf, const neutral]
 
-||| Run the given MSF only if the input fired an event.
+||| Run the given MSF only if the input fired no event.
 export
 ifNoEvent : Monoid o => MSF m () o -> MSF m (Event i) o
 ifNoEvent sf = event >>> collect [const neutral, sf]
 
+||| Fire an event whenever the input value changed.
+||| Always fires on first input.
 export
-onChange : Eq o => MSF m o (Event o)
+onChange : Eq i => MSF m i (Event i)
 onChange = mealy accum  NoEv
-  where accum : o -> Event o -> (Event o, Event o)
+  where accum : i -> Event i -> (Event i, Event i)
         accum v old =
           let ev = Ev v
            in if ev == old then (NoEv, old) else (ev,ev)
 
+||| Left-biased union of event streams: Fires an event
+||| whenever either of the event streams fires an event.
+||| In case of simultaneous events, the one from the
+||| left event stream is used.
 export
 (<|>) : MSF m i (Event o) -> MSF m i (Event o) -> MSF m i (Event o)
 (<|>) = elementwise2 (\e1,e2 => e1 <|> e2)
+
+||| Fires the first input as an event whenever the
+||| second input fires.
+export
+onEvent : MSF m (NP I [a, Event e]) (Event a)
+onEvent = arr $ \case [va,e] => e $> va
+
+||| Combines the first input with the event fired by the
+||| second input.
+export
+onEventWith : (a -> e -> b) -> MSF m (NP I [a, Event e]) (Event b)
+onEventWith f = arr $ \case [va,e] => f va <$> e
+
+||| Combines an input event stream with a stream function
+||| holding an `Either` trying to extract a `Left` whenever
+||| an event is fired.
+export
+leftOnEvent : MSF m (NP I [Either a b, Event e]) (Event a)
+leftOnEvent = arr $ \case [Left va,e] => e $> va
+                          _           => NoEv
+
+||| Combines an input event stream with a stream function
+||| holding an `Either` trying to extract a `Right` whenever
+||| an event is fired.
+export
+rightOnEvent : MSF m (NP I [Either a b, Event e]) (Event b)
+rightOnEvent = arr $ \case [Right vb,e] => e $> vb
+                           _            => NoEv
+
+||| Combines an input event stream with a stream function
+||| holding a `Maybe` trying to extract the value from a `Just` whenever
+||| an event is fired.
+export
+justOnEvent : MSF m (NP I [Maybe a, Event e]) (Event a)
+justOnEvent = arr $ \case [Just va,e] => e $> va
+                          _           => NoEv
