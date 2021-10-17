@@ -2,6 +2,8 @@ module Data.MSF.Event
 
 %default total
 
+||| A data type isomorphic to `Maybe` used to signal
+||| occurences of discrete events.
 public export
 data Event : (a : Type) -> Type where
   NoEv : Event a

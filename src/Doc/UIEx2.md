@@ -11,10 +11,11 @@ module Doc.UIEx2
 
 import Control.Applicative.Syntax
 import Control.Monad.Identity
-import Control.Monad.Writer
+import Control.Monad.State
 import Data.Either
 import Data.List
 import Data.MSF
+import Data.MSF.Trans
 import Data.Maybe
 import Data.So
 
@@ -184,11 +185,11 @@ communication from the controller to the UI.
 printCommands : List String -> String
 printCommands = concat . intersperse ", "
 
-Monad m => MonadUI (WriterT (List String) m) where
-  enableSubmit True  = tell [ "enable submit" ]
-  enableSubmit False = tell [ "disable submit" ]
-  validity f v       = tell [ #"\#{print f}: \#{print v}"# ]
-  submit acc         = tell [ #"submit: \#{print acc}"# ]
+Monad m => MonadUI (StateT (List String) m) where
+  enableSubmit True  = modify ("enable submit" ::)
+  enableSubmit False = modify ("disable submit" ::)
+  validity f v       = modify (#"\#{print f}: \#{print v}"# ::)
+  submit acc         = modify (#"submit: \#{print acc}"# ::)
 ```
 
 In order to get one line of logging output for each input
@@ -196,9 +197,13 @@ event, we traverse over the list of loggings using
 `putStrLn`.
 
 ```idris
-simulate : MSF (Writer (List String)) Ev () -> List Ev -> IO ()
+clear : MSF (State (List String)) i i
+clear = observeWith (const Nil >>> put)
+
+simulate : MSF (State (List String)) Ev () -> List Ev -> IO ()
 simulate sf es = traverse_ (putStrLn . printCommands)
-               $ embedI es (unWriter_ sf)
+               $ evalState Nil
+               $ embed es (clear >>> sf >>> get)
 ```
 
 Note also the call to `Data.MSF.Trans.unWriter_`. For certain

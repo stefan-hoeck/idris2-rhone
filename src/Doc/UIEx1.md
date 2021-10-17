@@ -18,6 +18,7 @@ module Doc.UIEx1
 
 import Control.Monad.State
 import Data.MSF
+import Data.MSF.Trans
 import Generics.Derive
 
 %language ElabReflection

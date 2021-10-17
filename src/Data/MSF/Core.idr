@@ -4,7 +4,8 @@
 |||
 ||| An MSF is an effectful computation from an input of type `i`
 ||| to an output of type `o`, that can be described using a rich
-||| library of combinators and evaluated using function `step`,
+||| library of combinators and evaluated using function
+||| `Data.MSF.Running.step`,
 ||| which not only produces an output for every input value
 ||| but also a new MSF to be used in the next evaluation step.
 module Data.MSF.Core
@@ -35,7 +36,7 @@ mutual
   namespace FanList
     ||| A heterogeneous list of MSFs all of which
     ||| accept the same input type. This is used for
-    ||| broadcasting a input stream across several MSFs,
+    ||| broadcasting a input value across several MSFs,
     ||| collecting the result as an n-ary product.
     ||| See also function `fan`.
     public export
@@ -78,11 +79,11 @@ mutual
   ||| some of which are there for reasons of efficiency.
   ||| In later versions of this library, `MSF` might
   ||| no longer be publicly exported, so client code should
-  ||| use the provided combinators instaed of accessing the
+  ||| use the provided combinators instead of accessing the
   ||| data constructors directly.
   |||
   ||| `MSF` objects can be stepwise evaluated by invoking
-  ||| function `step`.
+  ||| function `Data.MSF.Running.step`.
   public export
   data MSF : (m : Type -> Type) -> (i : Type) -> (o : Type) -> Type where
 
@@ -123,23 +124,14 @@ mutual
     ||| evaluated immediately and used henceforth.
     Switch    :  MSF m i (Either e o) -> (e -> MSF m i o) -> MSF m i o
   
-    ||| Single time delayed switiching: Upon the first event,
+    ||| Single time delayed switching: Upon the first event,
     ||| the second stream function is generated but the
     ||| former output is returned. The freshly 
     ||| generated stream function is used in all future
     ||| evaluation steps.
     |||
-    ||| It is safe to use this in arbitrary recursive calls.
+    ||| It is safe to use this in recursive calls.
     DSwitch   :  MSF m i (Either (e,o) o) -> Inf (e -> MSF m i o) -> MSF m i o
-
-    RSwitch   :  MSF m i o -> MSF m (NP I [i, Maybe $ MSF m i o]) o
-
-    ||| Changes the context of an MSF without affecting
-    ||| its internal structure (the wiring remains the same)
-    Morph     :  Monad m1
-              => (forall c . (a1 -> m1 (b1, c)) -> (a2 -> m2 (b2, c)))
-              -> MSF m1 a1 b1
-              -> MSF m2 a2 b2
 
 --------------------------------------------------------------------------------
 --          Lifting Primitives
@@ -165,7 +157,7 @@ export %inline
 arrM : (i -> m o) -> MSF m i o
 arrM = Lifted
 
-||| Lifting an value in a context to an MSF
+||| Lifting a value in a context to an MSF
 export %inline
 constM : m o -> MSF m i o
 constM = Lifted . const
@@ -174,7 +166,7 @@ constM = Lifted . const
 --          Sequencing MSFs
 --------------------------------------------------------------------------------
 
-infixr 1 >>^, ^>>, >>>, >>!, !>>
+infixr 1 >>>
 
 ||| Sequencing of MSFs
 export %inline

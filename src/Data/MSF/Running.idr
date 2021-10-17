@@ -59,6 +59,9 @@ mutual
     (vo, sfs2) <- stepCollect sfs y
     pure (vo, sf :: sfs2)
 
+  ||| Single step evaluation of monadic stream functions.
+  ||| This is used to drive a typical application using
+  ||| MSFs for processing input.
   export
   step : Monad m => MSF m i o -> i -> m (o, MSF m i o)
   step c@(Const x)  _ = pure (x, c)
@@ -92,23 +95,13 @@ mutual
     (Left(e, o),_) <- step sf i
       | (Right o,sf2) => pure (o, DSwitch sf2 f)
     pure (o, f e)
-  
-  step (RSwitch sf) [i,Nothing] = do
-    (o,sf2) <- step sf i
-    pure (o, RSwitch sf2)
-
-  step (RSwitch sf) [i,Just cont] = do
-    (o,sf2) <- assert_total $ step cont i
-    pure (o, RSwitch sf2)
-
-  step (Morph f sf) i = do
-    (o,sf2) <- f (step sf) i
-    pure (o, Morph f sf2)
 
 --------------------------------------------------------------------------------
 --          Running MSFs
 --------------------------------------------------------------------------------
 
+||| Uses the given MSF to process a list of input
+||| values. This is useful for testing MSFs.
 export
 embed : Monad m => List i -> MSF m i o -> m (List o)
 embed [] _          = pure []
@@ -117,6 +110,7 @@ embed (vi :: is) sf = do
   os       <- embed is sf2
   pure $ vo :: os
 
+||| `embed` using the `Identity` monad.
 export
 embedI : List i -> MSF Identity i o -> List o
 embedI is = runIdentity . embed is
@@ -134,19 +128,20 @@ mutual
   sizeCol [] = 0
   sizeCol (sf :: sfs) = size sf + sizeCol sfs
 
+  ||| Calculates the size (number of constructors)
+  ||| of a MSF. This is useful for testing and
+  ||| possibly optimizing applications.
   export
   size : MSF m i o -> Nat
-  size Id = 1
-  size (Const x) = 1
-  size (Arr f) = 1
-  size (Lifted f) = 1
-  size (Seq x y) = size x + size y
-  size (Par x) = 1 + sizePar x
-  size (Fan x) = 1 + sizeFan x
-  size (Choice x) = 1 + sizePar x
-  size (Collect x) = 1 + sizeCol x
-  size (Loop x y) = 1 + size y
-  size (Switch x f) = 1 + size x
+  size Id            = 1
+  size (Const x)     = 1
+  size (Arr f)       = 1
+  size (Lifted f)    = 1
+  size (Seq x y)     = 1 + size x + size y
+  size (Par x)       = 1 + sizePar x
+  size (Fan x)       = 1 + sizeFan x
+  size (Choice x)    = 1 + sizePar x
+  size (Collect x)   = 1 + sizeCol x
+  size (Loop x y)    = 1 + size y
+  size (Switch x f)  = 1 + size x
   size (DSwitch x y) = 1 + size x
-  size (RSwitch x) = 1 + size x
-  size (Morph f x) = 1 + size x
