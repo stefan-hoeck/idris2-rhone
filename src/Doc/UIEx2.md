@@ -183,7 +183,7 @@ communication from the controller to the UI.
 
 ```idris
 printCommands : List String -> String
-printCommands = concat . intersperse ", "
+printCommands = concat . intersperse ", " . reverse
 
 Monad m => MonadUI (StateT (List String) m) where
   enableSubmit True  = modify ("enable submit" ::)

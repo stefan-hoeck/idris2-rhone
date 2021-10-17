@@ -316,7 +316,7 @@ reactive programming, we are going to need an input of
 time deltas for many operations. There are several ways
 to go about this: We could use MSFs pairing the
 current time delta with each input value:
-`MSF m (NP I [DTime,i]) o`. This gets cumbersom if
+`MSF m (NP I [DTime,i]) o`. This gets cumbersome if
 we start nesting networks of signal functions and need
 to make sure the time deltas are passed on to all subsystems.
 We could also use some kind of reader monad, where asking
