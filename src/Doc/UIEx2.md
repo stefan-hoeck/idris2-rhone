@@ -178,18 +178,24 @@ interface Monad m => MonadUI m where
   validity      : Field   -> Either Invalid t -> m ()
 ```
 
-For testing, we use the `Writer` monad for logging all
-communication from the controller to the UI.
+For testing, we again use the `State` monad for logging all
+communication from the controller to the UI (we don't
+use the `Writer` monad as we want to be able to
+write a preprocessing MSF for clearing the accumulated
+logs at each evaluation step).
 
 ```idris
 printCommands : List String -> String
 printCommands = concat . intersperse ", " . reverse
 
+log : MonadState (List String) m => String -> m ()
+log s = modify (s ::)
+
 Monad m => MonadUI (StateT (List String) m) where
-  enableSubmit True  = modify ("enable submit" ::)
-  enableSubmit False = modify ("disable submit" ::)
-  validity f v       = modify (#"\#{print f}: \#{print v}"# ::)
-  submit acc         = modify (#"submit: \#{print acc}"# ::)
+  enableSubmit True  =log "enable submit"
+  enableSubmit False =log "disable submit"
+  validity f v       =log #"\#{print f}: \#{print v}"#
+  submit acc         =log #"submit: \#{print acc}"#
 ```
 
 In order to get one line of logging output for each input
@@ -205,19 +211,6 @@ simulate sf es = traverse_ (putStrLn . printCommands)
                $ evalState Nil
                $ embed es (clear >>> sf >>> get)
 ```
-
-Note also the call to `Data.MSF.Trans.unWriter_`. For certain
-monad transformers like `Reader`, `Writer`, or `State`,
-MSFs make it very easy to break out of the outer monadic
-context without affecting the inner structure (wiring) of the MSF.
-An `MSF (WriterT w m) i o`, for instance, is isomorphic to
-an `MSF m i (o,w)`. `Data.MSF.Trans` provides the necessary
-conversion utilities.
-
-In the example above, `unWriter_ sf`
-has type `MSF Identity Ev (List String)`, so we will on
-each evaluation step get a list with the logged commands
-as a result.
 
 ### First Try: Validating an MSF directly
 
