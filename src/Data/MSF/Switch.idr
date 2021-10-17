@@ -17,7 +17,7 @@ switchE = Switch
 
 ||| Produces output of the first MSF until the second
 ||| fires an event, in which case a new MSF is created,
-||| which will evaluated immediately and used henceforth.
+||| which will be evaluated immediately and used henceforth.
 export
 switchWhen :  MSF m i o
            -> MSF m i (Event e)
@@ -25,13 +25,17 @@ switchWhen :  MSF m i o
            -> MSF m i o
 switchWhen sf ev =
   switchE $ fan [sf, ev] >>^ (\[vo,ve] => event (Right vo) Left ve)
-  
+
 ||| Produces output of the first MSF until it returns a
 ||| `Left`, in which case a new MSF will be created and
 ||| used for processing all future input values.
 export %inline
 dswitch : MSF m i (Either (e,o) o) -> Inf (e -> MSF m i o) -> MSF m i o
 dswitch = DSwitch
+
+export %inline
+rSwitch : MSF m i o -> MSF m (NP I [i, Event $ MSF m i o]) o
+rSwitch sf = (\[vi,m] => [vi,eventToMaybe m]) ^>> RSwitch sf
 
 ||| Produces output of the first MSF until the second
 ||| fires an event, in which case a new MSF is created,
@@ -41,12 +45,14 @@ rswitchWhen :  MSF m i o
             -> MSF m i (Event e)
             -> (e -> MSF m i o)
             -> MSF m i o
-rswitchWhen ini es f =
-  dswitch (fan [ini, Freeze es] >>^ next) cont
-  where next :  NP I [o,NP I [MSF m i (Event e), Event e]]
-             -> Either (NP I [MSF m i (Event e), e],o) o
-        next [vo,[_,NoEv]]   = Right vo
-        next [vo,[sf,Ev ve]] = Left ([sf,ve],vo)
+rswitchWhen ini es f = fan [id, es >>^ map f] >>> rSwitch ini
 
-        cont : NP I [MSF m i (Event e), e] -> MSF m i o
-        cont [sf,ve] = rswitchWhen (f ve) sf f
+export
+resetOn :  (x -> MSF m i o)
+        -> (o -> Event x)
+        -> (ini : x)
+        -> MSF m i o
+resetOn f ev ini =   feedback NoEv 
+                 $   swap
+                 >>> rSwitch (f ini)
+                 >>> fan [arr $ map f . ev, id]

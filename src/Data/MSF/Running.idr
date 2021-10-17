@@ -4,6 +4,8 @@ import Control.Monad.Identity
 import Data.MSF.Core
 import Data.SOP
 
+%default total
+
 --------------------------------------------------------------------------------
 --          Single step evaluation
 --------------------------------------------------------------------------------
@@ -80,10 +82,6 @@ mutual
   step (Loop s sf) v = do
     ([s2,o], sf2) <- step sf [s,v]
     pure (o, Loop s2 sf2)
-  
-  step (Morph f msf) v = do
-    (o, msf2) <- f (step msf) v
-    pure (o, Morph f msf2)
 
   step (Switch sf f) i = do
     (Left e,_) <- step sf i
@@ -95,9 +93,17 @@ mutual
       | (Right o,sf2) => pure (o, DSwitch sf2 f)
     pure (o, f e)
   
-  step (Freeze sf) i = do
+  step (RSwitch sf) [i,Nothing] = do
     (o,sf2) <- step sf i
-    pure ([sf2,o], Freeze sf2)
+    pure (o, RSwitch sf2)
+
+  step (RSwitch sf) [i,Just cont] = do
+    (o,sf2) <- assert_total $ step cont i
+    pure (o, RSwitch sf2)
+
+  step (Morph f sf) i = do
+    (o,sf2) <- f (step sf) i
+    pure (o, Morph f sf2)
 
 --------------------------------------------------------------------------------
 --          Running MSFs
@@ -114,3 +120,33 @@ embed (vi :: is) sf = do
 export
 embedI : List i -> MSF Identity i o -> List o
 embedI is = runIdentity . embed is
+
+mutual
+  sizePar : MSFList m is os -> Nat
+  sizePar [] = 0
+  sizePar (sf :: sfs) = size sf + sizePar sfs
+
+  sizeFan : FanList m i os -> Nat
+  sizeFan [] = 0
+  sizeFan (sf :: sfs) = size sf + sizeFan sfs
+
+  sizeCol : CollectList m is o -> Nat
+  sizeCol [] = 0
+  sizeCol (sf :: sfs) = size sf + sizeCol sfs
+
+  export
+  size : MSF m i o -> Nat
+  size Id = 1
+  size (Const x) = 1
+  size (Arr f) = 1
+  size (Lifted f) = 1
+  size (Seq x y) = size x + size y
+  size (Par x) = 1 + sizePar x
+  size (Fan x) = 1 + sizeFan x
+  size (Choice x) = 1 + sizePar x
+  size (Collect x) = 1 + sizeCol x
+  size (Loop x y) = 1 + size y
+  size (Switch x f) = 1 + size x
+  size (DSwitch x y) = 1 + size x
+  size (RSwitch x) = 1 + size x
+  size (Morph f x) = 1 + size x

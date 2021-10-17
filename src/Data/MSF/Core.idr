@@ -118,13 +118,6 @@ mutual
     ||| Feedback loops (stateful computations)
     Loop      :  s -> MSF m (NP I [s, i]) (NP I [s, o]) -> MSF m i o
   
-    ||| Changes the context of an MSF without affecting
-    ||| its internal structure (the wiring remains the same)
-    Morph     :  Monad m1
-              => (forall c . (a1 -> m1 (b1, c)) -> (a2 -> m2 (b2, c)))
-              -> MSF m1 a1 b1
-              -> MSF m2 a2 b2
-  
     ||| Single time switching: Upon the first event,
     ||| the second stream function is calculated,
     ||| evaluated immediately and used henceforth.
@@ -139,7 +132,14 @@ mutual
     ||| It is safe to use this in arbitrary recursive calls.
     DSwitch   :  MSF m i (Either (e,o) o) -> Inf (e -> MSF m i o) -> MSF m i o
 
-    Freeze : MSF m i o -> MSF m i (NP I [MSF m i o, o])
+    RSwitch   :  MSF m i o -> MSF m (NP I [i, Maybe $ MSF m i o]) o
+
+    ||| Changes the context of an MSF without affecting
+    ||| its internal structure (the wiring remains the same)
+    Morph     :  Monad m1
+              => (forall c . (a1 -> m1 (b1, c)) -> (a2 -> m2 (b2, c)))
+              -> MSF m1 a1 b1
+              -> MSF m2 a2 b2
 
 --------------------------------------------------------------------------------
 --          Lifting Primitives
