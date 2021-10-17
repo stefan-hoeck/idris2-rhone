@@ -191,7 +191,7 @@ fan : FanList m i os -> MSF m i (NP I os)
 fan = Fan
 
 ||| Apply a binary function to the result of running
-||| two MSFs in parallel
+||| two MSFs in parallel.
 export %inline
 elementwise2 : (o1 -> o2 -> o3) -> MSF m i o1 -> MSF m i o2 -> MSF m i o3
 elementwise2 f x y = fan [x,y] >>> arr (\[a,b] => f a b)
