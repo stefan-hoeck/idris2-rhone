@@ -73,7 +73,7 @@ in Haskell, the examples in the article mentioned above
 make strong use of (arbitrary) recursion and laziness to set
 up interesting and powerful stream networks and
 programmers have to be very careful
-to not come up with an unsound MSF that will loop forver.
+to not come up with an unsound MSF that will loop forever.
 It is my hope that Idris and its totality checker
 will be able to safe us from falling into this trap most
 of the time.
@@ -311,29 +311,44 @@ Time : Type
 Time = Nat
 ```
 
-If we get an input of time deltas, we can calculate the
+If we are going to use MSFs to emulate arrowized functional
+reactive programming, we are going to need an input of
+time deltas for many operations. There are several ways
+to go about this: We could use MSFs pairing the
+current time delta with each input value:
+`MSF m (NP I [DTime,i]) o`. This gets cumbersom if
+we start nesting networks of signal functions and need
+to make sure the time deltas are passed on to all subsystems.
+We could also use some kind of reader monad, where asking
+for the current time delta is just a monadic action.
+Here, I generalize the above by just passing an implicit
+getter function as an argument to all combinators.
+
+For instance, if we get an input of time deltas, we can calculate the
 time since when the system was running:
 
 ```idris
-time : MSF m DTime Time
-time = accumulateWith (+) 0
+time : (dt : m DTime) => MSF m i Time
+time = constM dt >>> accumulateWith (+) 0
 ```
 
 We can also use time deltas to calculate integrals
 of time-varying entities:
 
 ```idris
-integral_ : MSF m (NP I [Double,DTime]) Double
+integral_ : (dt : m DTime) => MSF m Double Double
 integral_ =
-  feedback 0 $ arr (\[acc,[v,dt]] => let a2 = acc + v * cast dt in [a2,a2])
+  fan [id, constM dt] >>>
+  feedback 0 (arr (\[acc,[v,d]] => let a2 = acc + v * cast d in [a2,a2]))
 ```
 
 The above uses the `feedback` primitive directly. However, in this case it
 is more convenient, to use `accumulateWith`:
 
 ```idris
-integral : MSF m (NP I [Double,DTime]) Double
-integral = accumulateWith (\[v,dt],acc => acc + v * cast dt) 0
+integral : (dt : m DTime) => MSF m Double Double
+integral =   fan [id, constM dt]
+         >>> accumulateWith (\[v,d],acc => acc + v * cast d) 0
 ```
 
 With this we can simulate the movement (velocity
@@ -352,10 +367,10 @@ Position = Double
 g : Acceleration
 g = -9.81
 
-velocity : (v0 : Velocity) -> MSF m (NP I [Acceleration,DTime]) Velocity
+velocity : m DTime => (v0 : Velocity) -> MSF m Acceleration Velocity
 velocity v0 = integral + const v0
 
-position : (p0 : Position) -> MSF m (NP I [Velocity,DTime]) Position
+position : m DTime => (p0 : Position) -> MSF m Velocity Position
 position p0 = integral + const p0
 
 record Ball where
@@ -363,20 +378,17 @@ record Ball where
   pos : Position
   vel : Velocity
 
-ball : (ini : Ball) -> MSF m DTime Ball
-ball ini =   fan [fan [const g, id] >>> velocity ini.vel, id]
-         >>> fan [position ini.pos, hd]
+ball : m DTime => (ini : Ball) -> MSF m i Ball
+ball ini =   const g >>> velocity ini.vel
+         >>> fan [position ini.pos, id]
          >>^ (\[p,v] => MkBall p v)
 
-ballGame : (ini : Ball) -> MSF m DTime String
-ballGame ini = fan [time, ball ini] >>^ dispBall
+ballGame : m DTime -> (ini : Ball) -> MSF m i String
+ballGame dt ini = fan [time, ball ini] >>^ dispBall
   where dispBall : NP I [Time,Ball] -> String
         dispBall [t,MkBall p v] =
           #"t: \#{show t}; y: \#{show p}; v: \#{show v}"#
 
 testBallGame : List String
-testBallGame = embedI (0 :: replicate 10 1) (ballGame $ MkBall 500 0)
+testBallGame = embedI (replicate 10 ()) (ballGame (Id 1) $ MkBall 500 0)
 ```
-
-We will come back to this example once we have a better
-understanding of using the monadic contexts involved.
