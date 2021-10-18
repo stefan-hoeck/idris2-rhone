@@ -146,6 +146,12 @@ ifIsNot v = ifFalse (v ==)
 --          Looping Utilities
 --------------------------------------------------------------------------------
 
+||| Uses the given value as a seed for feeding back output
+||| of the MSF back to its input.
+export
+feedback_ : s -> MSF m (NP I [s,i]) s -> MSF m i ()
+feedback_ v sf = feedback v $ sf >>^ (:: [()])
+
 ||| Delay a stream by one sample.
 export %inline
 iPre : o -> MSF m o o
