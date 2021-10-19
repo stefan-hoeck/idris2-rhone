@@ -2,6 +2,7 @@ module Data.MSF.Running
 
 import Control.Monad.Identity
 import Data.MSF.Core
+import Data.MSF.Event
 import Data.SOP
 
 %default total
@@ -91,10 +92,13 @@ mutual
       | (Right o,sf2) => pure (o, Switch sf2 f)
     step (f e) i
   
-  step (DSwitch sf f) i = do
-    (Left(e, o),_) <- step sf i
-      | (Right o,sf2) => pure (o, DSwitch sf2 f)
-    pure (o, f e)
+  step (DRSwitch sf) [i,NoEv] = do
+    (o,sf2) <- step sf i
+    pure (o, DRSwitch sf2)
+  
+  step (DRSwitch sf) [i,Ev sfNew] = do
+    (o,_) <- step sf i
+    pure (o, DRSwitch sfNew)
 
 --------------------------------------------------------------------------------
 --          Running MSFs
@@ -144,4 +148,4 @@ mutual
   size (Collect x)   = 1 + sizeCol x
   size (Loop x y)    = 1 + size y
   size (Switch x f)  = 1 + size x
-  size (DSwitch x y) = 1 + size x
+  size (DRSwitch x)  = 1 + size x

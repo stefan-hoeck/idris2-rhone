@@ -53,23 +53,6 @@ switch sf = switchE $ sf >>^ (\[vo,ve] => event (Right vo) Left ve)
 --          Delayed Switches
 --------------------------------------------------------------------------------
 
-||| Delayed switching primitive.
-|||
-||| Produces output of the first MSF until it returns a
-||| `Left`, in which case a new MSF will be created and
-||| used for processing all future input values.
-|||
-||| This has almost the same type signature as `switchE`
-||| but there is an important difference: The replacing
-||| MSF will not be used to generate output until the
-||| next evaluation cycle. It is therefore safe to use
-||| this in a recursive setting, but keep in mind that
-||| you will get the new behavior only after a delay of
-||| single step.
-export %inline
-dSwitchE : MSF m i (Either (e,o) o) -> Inf (e -> MSF m i o) -> MSF m i o
-dSwitchE = DSwitch
-
 rswUtil : NP I [o,Event x] -> Either (x,o) o
 rswUtil [vo,Ev vx] = Left (vx,vo)
 rswUtil [vo,NoEv]  = Right vo
@@ -81,16 +64,16 @@ rswUtil [vo,NoEv]  = Right vo
 ||| This uses `dSwitchE` internally, so all restrictions mentioned
 ||| there apply.
 export
-dSwitch : MSF m i (NP I [o, Event e]) -> Inf (e -> MSF m i o) -> MSF m i o
-dSwitch sf = dSwitchE $ sf >>^ rswUtil
+dSwitch : MSF m i (NP I [o, Event e]) -> (e -> MSF m i o) -> MSF m i o
+dSwitch sf = switch (sf >>> par [id, iPre NoEv])
 
 --------------------------------------------------------------------------------
 --          Recurring Switches
 --------------------------------------------------------------------------------
 
-export
+export %inline
 drSwitch : MSF m i o -> MSF m (NP I [i, Event $ MSF m i o]) o
-drSwitch sf = dSwitchE (par [sf,id] >>^ rswUtil) drSwitch
+drSwitch = DRSwitch
 
 ||| Produces output of the first MSF until the second
 ||| fires an event, in which case a new MSF is created,
@@ -101,10 +84,3 @@ drswitchWhen :  MSF m i o
              -> (e -> MSF m i o)
              -> MSF m i o
 drswitchWhen ini es f = fan [id, es >>^ map f] >>> drSwitch ini
-
-export
-resetOn :  (x -> MSF m i o)
-        -> (o -> Event x)
-        -> (ini : x)
-        -> MSF m i o
-resetOn f g vx = dSwitchE (f vx >>> fan [id,arr g] >>^ rswUtil) (resetOn f g)

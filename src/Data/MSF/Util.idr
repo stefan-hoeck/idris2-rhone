@@ -243,11 +243,18 @@ export
 hold : o -> MSF m (Event o) o
 hold = accumulateWith (\ev,v => fromEvent v ev)
 
+export
+ntimes : Nat -> o -> MSF m i (Event o)
+ntimes n vo = Switch (feedback n $ arr next) (const never)
+  where next : NP I [Nat,i] -> NP I [Nat,Either () (Event o)]
+        next [0,_]   = [0, Left ()]
+        next [S k,_] = [k, Right $ Ev vo]
+
 ||| Fire the given event exactly once on the first
 ||| evaluation step.
 export
 once : o -> MSF m i (Event o)
-once v = DSwitch (const $ Left ((),Ev v)) (const never)
+once = ntimes 1
 
 ||| Fire an event whenever the given predicate holds.
 export

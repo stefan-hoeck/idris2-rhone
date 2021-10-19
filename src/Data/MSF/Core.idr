@@ -10,6 +10,7 @@
 ||| but also a new MSF to be used in the next evaluation step.
 module Data.MSF.Core
 
+import Data.MSF.Event
 import Data.SOP
 
 %default total
@@ -124,14 +125,9 @@ mutual
     ||| evaluated immediately and used henceforth.
     Switch    :  MSF m i (Either e o) -> (e -> MSF m i o) -> MSF m i o
   
-    ||| Single time delayed switching: Upon the first event,
-    ||| the second stream function is generated but the
-    ||| former output is returned. The freshly 
-    ||| generated stream function is used in all future
-    ||| evaluation steps.
-    |||
-    ||| It is safe to use this in recursive calls.
-    DSwitch   :  MSF m i (Either (e,o) o) -> Inf (e -> MSF m i o) -> MSF m i o
+    ||| Recurring switch: The behavior is switched
+    ||| to the new MSF whenever the input fires an event.
+    DRSwitch   :  MSF m i o -> MSF m (NP I [i, Event $ MSF m i o]) o
 
 --------------------------------------------------------------------------------
 --          Lifting Primitives
