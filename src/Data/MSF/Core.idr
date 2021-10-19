@@ -4,11 +4,13 @@
 |||
 ||| An MSF is an effectful computation from an input of type `i`
 ||| to an output of type `o`, that can be described using a rich
-||| library of combinators and evaluated using function `step`,
+||| library of combinators and evaluated using function
+||| `Data.MSF.Running.step`,
 ||| which not only produces an output for every input value
 ||| but also a new MSF to be used in the next evaluation step.
 module Data.MSF.Core
 
+import Data.MSF.Event
 import Data.SOP
 
 %default total
@@ -35,7 +37,7 @@ mutual
   namespace FanList
     ||| A heterogeneous list of MSFs all of which
     ||| accept the same input type. This is used for
-    ||| broadcasting a input stream across several MSFs,
+    ||| broadcasting a input value across several MSFs,
     ||| collecting the result as an n-ary product.
     ||| See also function `fan`.
     public export
@@ -78,11 +80,11 @@ mutual
   ||| some of which are there for reasons of efficiency.
   ||| In later versions of this library, `MSF` might
   ||| no longer be publicly exported, so client code should
-  ||| use the provided combinators instaed of accessing the
+  ||| use the provided combinators instead of accessing the
   ||| data constructors directly.
   |||
   ||| `MSF` objects can be stepwise evaluated by invoking
-  ||| function `step`.
+  ||| function `Data.MSF.Running.step`.
   public export
   data MSF : (m : Type -> Type) -> (i : Type) -> (o : Type) -> Type where
 
@@ -118,28 +120,14 @@ mutual
     ||| Feedback loops (stateful computations)
     Loop      :  s -> MSF m (NP I [s, i]) (NP I [s, o]) -> MSF m i o
   
-    ||| Changes the context of an MSF without affecting
-    ||| its internal structure (the wiring remains the same)
-    Morph     :  Monad m1
-              => (forall c . (a1 -> m1 (b1, c)) -> (a2 -> m2 (b2, c)))
-              -> MSF m1 a1 b1
-              -> MSF m2 a2 b2
-  
     ||| Single time switching: Upon the first event,
     ||| the second stream function is calculated,
     ||| evaluated immediately and used henceforth.
     Switch    :  MSF m i (Either e o) -> (e -> MSF m i o) -> MSF m i o
   
-    ||| Single time delayed switiching: Upon the first event,
-    ||| the second stream function is generated but the
-    ||| former output is returned. The freshly 
-    ||| generated stream function is used in all future
-    ||| evaluation steps.
-    |||
-    ||| It is safe to use this in arbitrary recursive calls.
-    DSwitch   :  MSF m i (Either (e,o) o) -> Inf (e -> MSF m i o) -> MSF m i o
-
-    Freeze : MSF m i o -> MSF m i (NP I [MSF m i o, o])
+    ||| Recurring switch: The behavior is switched
+    ||| to the new MSF whenever the input fires an event.
+    DRSwitch   :  MSF m i o -> MSF m (NP I [i, Event $ MSF m i o]) o
 
 --------------------------------------------------------------------------------
 --          Lifting Primitives
@@ -165,7 +153,7 @@ export %inline
 arrM : (i -> m o) -> MSF m i o
 arrM = Lifted
 
-||| Lifting an value in a context to an MSF
+||| Lifting a value in a context to an MSF
 export %inline
 constM : m o -> MSF m i o
 constM = Lifted . const
@@ -174,7 +162,7 @@ constM = Lifted . const
 --          Sequencing MSFs
 --------------------------------------------------------------------------------
 
-infixr 1 >>^, ^>>, >>>, >>!, !>>
+infixr 1 >>>
 
 ||| Sequencing of MSFs
 export %inline
@@ -199,7 +187,7 @@ fan : FanList m i os -> MSF m i (NP I os)
 fan = Fan
 
 ||| Apply a binary function to the result of running
-||| two MSFs in parallel
+||| two MSFs in parallel.
 export %inline
 elementwise2 : (o1 -> o2 -> o3) -> MSF m i o1 -> MSF m i o2 -> MSF m i o3
 elementwise2 f x y = fan [x,y] >>> arr (\[a,b] => f a b)

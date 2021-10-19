@@ -12,11 +12,6 @@ import Data.SOP
 
 infixr 1 >>^, ^>>, >>!, !>>
 
-||| Reverse sequenceing of MSFs
-export %inline
-(.) : MSF m x o -> MSF m i x -> MSF m i o
-sf2 . sf1 = Seq sf1 sf2
-
 ||| Sequencing of an MSF and a pure function
 export %inline
 (>>^) : MSF m i o -> (o -> o2) -> MSF m i o2
@@ -44,7 +39,7 @@ f !>> sf = arrM f >>> sf
 ||| Like `fan` but discards the results.
 ||| This is mainly useful for broadcasting to data sinks
 ||| (streaming functions that do not produce any interesting
-||| out put).
+||| output).
 |||
 ||| TODO: Should we require a proof here that `os` is a list
 |||       of `Unit`?
@@ -79,6 +74,11 @@ export
 snd : MSF m (NP I (i :: i2 :: t)) i2
 snd = arr $ \(_ :: v :: _) => v
 
+||| Swaps a pair of input values
+export
+swap : MSF m (NP I [a,b]) (NP I [b,a])
+swap = arr $ \[va,vb] => [vb,va]
+
 --------------------------------------------------------------------------------
 --          Selecting Utilities
 --------------------------------------------------------------------------------
@@ -92,12 +92,12 @@ either = arr $ either Z (S . Z)
 ||| Run the given MSF only if the input is a `Left`.
 export
 ifLeft : Monoid o => MSF m i o -> MSF m (Either i a) o
-ifLeft sf = either >>> collect [sf, const neutral]
+ifLeft sf = either >>> collect [sf, neutral]
 
 ||| Run the given MSF only if the input is a `Right`.
 export
 ifRight : Monoid o => MSF m i o -> MSF m (Either a i) o
-ifRight sf = either >>> collect [const neutral, sf]
+ifRight sf = either >>> collect [neutral, sf]
 
 ||| Convert an `Maybe` input to a binary sum, which
 ||| can then be sequenced with a call to `choice` or `collect`.
@@ -108,12 +108,12 @@ maybe = arr $ maybe (S $ Z ()) Z
 ||| Run the given MSF only if the input is a `Just`.
 export
 ifJust : Monoid o => MSF m i o -> MSF m (Maybe i) o
-ifJust sf = maybe >>> collect [sf, const neutral]
+ifJust sf = maybe >>> collect [sf, neutral]
 
 ||| Run the given MSF only if the input is a `Nothing`.
 export
 ifNothing : Monoid o => MSF m () o -> MSF m (Maybe i) o
-ifNothing sf = maybe >>> collect [const neutral, sf]
+ifNothing sf = maybe >>> collect [neutral, sf]
 
 ||| Convert an input to a binary sum, depending on whether
 ||| the given predicate returns `True` or `False`. The result
@@ -125,12 +125,12 @@ bool f = arr $ \vi => if f vi then Z vi else (S $ Z vi)
 ||| Run the given MSF only if the predicate holds for the input.
 export
 ifTrue : Monoid o => (f : i -> Bool) -> MSF m i o -> MSF m i o
-ifTrue f sf = bool f >>> collect [sf, const neutral]
+ifTrue f sf = bool f >>> collect [sf, neutral]
 
 ||| Run the given MSF only if the predicate does not hold for the input.
 export
 ifFalse : Monoid o => (f : i -> Bool) -> MSF m i o -> MSF m i o
-ifFalse f sf = bool f >>> collect [const neutral, sf]
+ifFalse f sf = bool f >>> collect [neutral, sf]
 
 ||| Run the given MSF only if the input equlas the given value
 export
@@ -146,10 +146,16 @@ ifIsNot v = ifFalse (v ==)
 --          Looping Utilities
 --------------------------------------------------------------------------------
 
+||| Uses the given value as a seed for feeding back output
+||| of the MSF back to its input.
+export
+feedback_ : s -> MSF m (NP I [s,i]) s -> MSF m i ()
+feedback_ v sf = feedback v $ sf >>^ (:: [()])
+
 ||| Delay a stream by one sample.
 export %inline
 iPre : o -> MSF m o o
-iPre v = feedback v (arr $ \[delayed,new] => [new,delayed])
+iPre v = feedback v swap
 
 ||| Applies a function to the input and an accumulator,
 ||| outputting the updated accumulator.
@@ -193,7 +199,7 @@ export
 repeatedly : (o -> o) -> o -> MSF m i o
 repeatedly f = unfold $ \vo => let vo2 = f vo in [vo2,vo2]
 
-||| Cycles through the given non-empty vector of values.
+||| Cycles through the given non-empty list of values.
 export
 cycle : (vs : List o) -> {auto 0 prf : NonEmpty vs} -> MSF m i o
 cycle (h :: t) = unfold next (h :: t)
@@ -237,11 +243,18 @@ export
 hold : o -> MSF m (Event o) o
 hold = accumulateWith (\ev,v => fromEvent v ev)
 
+export
+ntimes : Nat -> o -> MSF m i (Event o)
+ntimes n vo = Switch (feedback n $ arr next) (const never)
+  where next : NP I [Nat,i] -> NP I [Nat,Either () (Event o)]
+        next [0,_]   = [0, Left ()]
+        next [S k,_] = [k, Right $ Ev vo]
+
 ||| Fire the given event exactly once on the first
 ||| evaluation step.
 export
 once : o -> MSF m i (Event o)
-once v = DSwitch (const $ Left ((),Ev v)) (const never)
+once = ntimes 1
 
 ||| Fire an event whenever the given predicate holds.
 export
@@ -307,7 +320,7 @@ onChange = mealy accum  NoEv
   where accum : i -> Event i -> NP I [Event i, Event i]
         accum v old =
           let ev = Ev v
-           in if ev == old then [old,NoEv] else [ev,ev]
+           in if ev == old then [ev,NoEv] else [ev,ev]
 
 ||| Left-biased union of event streams: Fires an event
 ||| whenever either of the event streams fires an event.
@@ -353,6 +366,21 @@ justOnEvent : MSF m (NP I [Maybe a, Event e]) (Event a)
 justOnEvent = arr $ \case [Just va,e] => e $> va
                           _           => NoEv
 
+--------------------------------------------------------------------------------
+--          Accumulating Events
+--------------------------------------------------------------------------------
+
+||| Applies a function to the input and an accumulator,
+||| outputting the updated accumulator whenever an
+||| event is fire.
 export
-countE : MSF m (Event i) Nat
-countE = accumulateWith (\e,n => event n (const $ n + 1) e) 0
+accumulateWithE : (i -> o -> o) -> o -> MSF m (Event i) (Event o)
+accumulateWithE f ini = feedback ini (arr g)
+  where g : NP I [o,Event i] -> NP I [o,Event o]
+        g [acc,NoEv]  = [acc,NoEv]
+        g [acc,Ev vi] = let acc' = f vi acc in [acc',Ev acc']
+
+||| Count the number of occurences of an event
+export
+countE : MSF m (Event i) (Event Nat)
+countE = accumulateWithE (\_,n => n + 1) 0
