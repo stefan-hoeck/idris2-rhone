@@ -1,5 +1,5 @@
 ||| This module can be used to run an SF for a long time
-||| to check for memory leaks.
+||| as quickly as possible to check for memory leaks.
 module Test.Leak
 
 import Control.ANSI.CSI
@@ -47,10 +47,13 @@ record Ball where
   pos : Double
   vel : Velocity
 
-dispBall : Ball -> String
-dispBall b = 
+dispBall : NP I [Ball,Nat] -> String
+dispBall [b,n] = 
   let char = if b.vel <= 0 then '<' else '>'
-   in cursorUp1 ++ eraseLine End ++ replicate (cast b.pos) char
+   in    cursorUp1
+      ++ eraseLine End
+      ++ padLeft 9 ' ' (show n)
+      ++ replicate (cast b.pos) char
 
 ballFrom : Ball -> SF i Ball
 ballFrom (MkBall p0 v0) =
@@ -70,7 +73,7 @@ game : MSF Identity () Ball
 game = const 0.0001 >>> unreader_ (ballGame $ MkBall 80 0)
 
 controller : MSF IO () ()
-controller = morph (pure . runIdentity) game >>! putStrLn . dispBall
+controller = morph (pure . runIdentity) (fan [game,count]) >>! putStrLn . dispBall
 
 run : Fuel -> IO ()
 run f = iterM (\_,sf => snd <$> step sf ()) (const ()) controller f
