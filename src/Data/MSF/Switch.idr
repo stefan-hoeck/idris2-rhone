@@ -10,6 +10,7 @@ module Data.MSF.Switch
 
 import Data.MSF.Core
 import Data.MSF.Event
+import Data.MSF.Running
 import Data.MSF.Util
 import Data.SOP
 
@@ -60,9 +61,6 @@ rswUtil [vo,NoEv]  = Right vo
 ||| Produces output of the given MSF until it fires an event,
 ||| in which case a new MSF is created,
 ||| which will be used in all further evaluation steps.
-|||
-||| This uses `dSwitchE` internally, so all restrictions mentioned
-||| there apply.
 export
 dSwitch : MSF m i (NP I [o, Event e]) -> (e -> MSF m i o) -> MSF m i o
 dSwitch sf = switch (sf >>> par [id, iPre NoEv])
@@ -72,15 +70,28 @@ dSwitch sf = switch (sf >>> par [id, iPre NoEv])
 --------------------------------------------------------------------------------
 
 export %inline
-drSwitch : MSF m i o -> MSF m (NP I [i, Event $ MSF m i o]) o
-drSwitch = DRSwitch
+rSwitch : Monad m => MSF m i o -> MSF m (NP I [Event $ MSF m i o,i]) o
+rSwitch sf =
+  feedback sf . arrM $
+    \[sf,[ev,vi]] => do
+      (vo,sf2) <- step (fromEvent sf ev) vi
+      pure [sf2,vo]
+
+export %inline
+drSwitch : Monad m => MSF m i o -> MSF m (NP I [Event $ MSF m i o,i]) o
+drSwitch sf =
+  feedback sf . arrM $
+    \[sf,[ev,vi]] => do
+      (vo,sf2) <- step sf vi
+      pure [fromEvent sf2 ev,vo]
 
 ||| Produces output of the first MSF until the second
 ||| fires an event, in which case a new MSF is created,
 ||| which will be used in all futre evaluation cycles.
 export
-drswitchWhen :  MSF m i o
+drswitchWhen :  Monad m
+             => MSF m i o
              -> MSF m i (Event e)
              -> (e -> MSF m i o)
              -> MSF m i o
-drswitchWhen ini es f = fan [id, es >>^ map f] >>> drSwitch ini
+drswitchWhen ini es f = fan [es >>^ map f,id] >>> drSwitch ini
