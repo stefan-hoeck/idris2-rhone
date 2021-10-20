@@ -16,6 +16,10 @@ import Data.String
 
 %default total
 
+--------------------------------------------------------------------------------
+--          Some FRP primitives
+--------------------------------------------------------------------------------
+
 DTime : Type
 DTime = Double
 
@@ -42,6 +46,10 @@ velocity v0 a0 = integralFrom a0 >>^ (+ v0)
 position : (p0 : Double) -> (v0 : Velocity) -> SF Velocity Double
 position p0 v0 = integralFrom v0 >>^ (+ p0)
 
+--------------------------------------------------------------------------------
+--          Bouncing Ball
+--------------------------------------------------------------------------------
+
 record Ball where
   constructor MkBall
   pos : Double
@@ -53,6 +61,7 @@ dispBall [b,n] =
    in    cursorUp1
       ++ eraseLine End
       ++ padLeft 9 ' ' (show n)
+      ++ "  "
       ++ replicate (cast b.pos) char
 
 ballFrom : Ball -> SF i Ball
@@ -78,6 +87,9 @@ controller = morph (pure . runIdentity) (fan [game,count]) >>! putStrLn . dispBa
 run : Fuel -> IO ()
 run f = iterM (\_,sf => snd <$> step sf ()) (const ()) controller f
 
+||| This uses monad morphisms and recursive switches under the hood,
+||| which were problematic in earlier implementations. Hence this test
+||| that they behave correctly over a prolonged period of time.
 partial
 main : IO ()
-main = run forever
+main = run (limit 10000000)
