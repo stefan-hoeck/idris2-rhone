@@ -124,10 +124,6 @@ mutual
     ||| the second stream function is calculated,
     ||| evaluated immediately and used henceforth.
     Switch    :  MSF m i (Either e o) -> (e -> MSF m i o) -> MSF m i o
-  
-    ||| Recurring switch: The behavior is switched
-    ||| to the new MSF whenever the input fires an event.
-    DRSwitch   :  MSF m i o -> MSF m (NP I [i, Event $ MSF m i o]) o
 
 --------------------------------------------------------------------------------
 --          Lifting Primitives

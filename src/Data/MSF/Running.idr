@@ -91,14 +91,6 @@ mutual
     (Left e,_) <- step sf i
       | (Right o,sf2) => pure (o, Switch sf2 f)
     step (f e) i
-  
-  step (DRSwitch sf) [i,NoEv] = do
-    (o,sf2) <- step sf i
-    pure (o, DRSwitch sf2)
-  
-  step (DRSwitch sf) [i,Ev sfNew] = do
-    (o,_) <- step sf i
-    pure (o, DRSwitch sfNew)
 
 --------------------------------------------------------------------------------
 --          Running MSFs
@@ -148,4 +140,3 @@ mutual
   size (Collect x)   = 1 + sizeCol x
   size (Loop x y)    = 1 + size y
   size (Switch x f)  = 1 + size x
-  size (DRSwitch x)  = 1 + size x
