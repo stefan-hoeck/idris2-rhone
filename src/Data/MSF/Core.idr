@@ -72,7 +72,7 @@ mutual
   ||| The [dunai](https://hackage.haskell.org/package/dunai)
   ||| library implements them as
   ||| `data MSF m i o = MSF (i -> m (o, MSF m i o))`
-  ||| but this most general for does not go well with
+  ||| but this most general form does not go well with
   ||| the Idris totality checker.
   |||
   ||| It is therefore implemented as a set of primitive
@@ -255,3 +255,9 @@ Integral o => Integral (MSF m i o) where
 export %inline
 Fractional o => Fractional (MSF m i o) where
   (/)  = elementwise2 (/)
+
+export
+Alternative f => Alternative (MSF m i . f)
+  using Applicative.Compose where
+    empty   = const empty
+    x <|> y = fan [x,y] >>> arr (\[vx,vy] => vx <|> vy)

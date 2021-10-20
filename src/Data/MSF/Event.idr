@@ -53,6 +53,11 @@ unionWith : (a -> a -> a) -> Event a -> Event a -> Event a
 unionWith f (Ev x) (Ev y) = Ev $ f x y
 unionWith _ x      y      = unionL x y
 
+public export
+filter : (a -> Bool) -> Event a -> Event a
+filter f NoEv    = NoEv
+filter f (Ev va) = if f va then Ev va else NoEv
+
 --------------------------------------------------------------------------------
 --          Interface Implementations
 --------------------------------------------------------------------------------
@@ -122,3 +127,11 @@ Semigroup a => Semigroup (Event a) where
 public export %inline
 Semigroup a => Monoid (Event a) where
   neutral = NoEv
+
+--------------------------------------------------------------------------------
+--          More Utilities
+--------------------------------------------------------------------------------
+
+public export
+mapMaybe : (a -> Maybe b) -> Event a -> Event b
+mapMaybe f ev = ev >>= maybeToEvent . f

@@ -243,6 +243,7 @@ export
 hold : o -> MSF m (Event o) o
 hold = accumulateWith (\ev,v => fromEvent v ev)
 
+||| Fire the given event `n` times.
 export
 ntimes : Nat -> o -> MSF m i (Event o)
 ntimes n vo = Switch (feedback n $ arr next) (const never)
@@ -322,14 +323,6 @@ onChange = mealy accum  NoEv
           let ev = Ev v
            in if ev == old then [ev,NoEv] else [ev,ev]
 
-||| Left-biased union of event streams: Fires an event
-||| whenever either of the event streams fires an event.
-||| In case of simultaneous events, the one from the
-||| left event stream is used.
-export
-(<|>) : MSF m i (Event o) -> MSF m i (Event o) -> MSF m i (Event o)
-(<|>) = elementwise2 (\e1,e2 => e1 <|> e2)
-
 ||| Fires the first input as an event whenever the
 ||| second input fires.
 export
@@ -365,6 +358,64 @@ export
 justOnEvent : MSF m (NP I [Maybe a, Event e]) (Event a)
 justOnEvent = arr $ \case [Just va,e] => e $> va
                           _           => NoEv
+
+--------------------------------------------------------------------------------
+--          Merging Event Streams
+--------------------------------------------------------------------------------
+
+||| Fires an event whenever one of the two given
+||| event streams fire. Uses the given function
+||| to combine simultaneously occuring events.
+export
+unionWith : (o -> o -> o)
+          -> MSF m i (Event o)
+          -> MSF m i (Event o)
+          -> MSF m i (Event o)
+unionWith = elementwise2 . unionWith
+
+||| Left-biased union of event streams.
+||| In case of simultaneously occuring events, the
+||| event from the first event stream is fired.
+|||
+||| This is the same behavior as `(<|>)` from
+||| the MSFs `Alternative` implementation
+export
+unionL : MSF m i (Event o) -> MSF m i (Event o) -> MSF m i (Event o)
+unionL = elementwise2 unionL
+
+||| Right-biased union of event streams.
+||| In case of simultaneously occuring events, the
+||| event from the second event stream is fired.
+export
+unionR : MSF m i (Event o) -> MSF m i (Event o) -> MSF m i (Event o)
+unionR = elementwise2 unionR
+
+||| Union of event streams using a `Semigroup` to
+||| merge values in case of simultaneously occuring events.
+|||
+||| This is an alias for `(<+>)`.
+export %inline
+union :  Semigroup o
+      => MSF m i (Event o)
+      -> MSF m i (Event o)
+      -> MSF m i (Event o)
+union = (<+>)
+
+--------------------------------------------------------------------------------
+--          Filtering Event Streams
+--------------------------------------------------------------------------------
+
+||| Filters an event stream, letting pass only values,
+||| fow which the given predicate holds.
+export
+filter : (o -> Bool) -> MSF m (Event o) (Event o)
+filter = arr . filter
+
+||| Filters an event stream, letting pass only values,
+||| fow which the given function returns a `Just`.
+export
+mapMaybe : (i -> Maybe o) -> MSF m (Event i) (Event o)
+mapMaybe = arr . mapMaybe
 
 --------------------------------------------------------------------------------
 --          Accumulating Events
