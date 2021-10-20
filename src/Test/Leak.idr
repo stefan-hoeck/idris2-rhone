@@ -79,7 +79,7 @@ ballGame : Ball -> SF i Ball
 ballGame b0 = feedback NoEv $ rSwitch (ballFrom b0) >>> fan [arr bounce, id]
 
 game : MSF Identity () Ball
-game = const 0.0001 >>> unreader_ (ballGame $ MkBall 80 0)
+game = const 0.0001 >>> fromReader_ (ballGame $ MkBall 80 0)
 
 controller : MSF IO () ()
 controller = morph (pure . runIdentity) (fan [game,count]) >>! putStrLn . dispBall
