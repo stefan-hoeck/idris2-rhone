@@ -255,9 +255,3 @@ Integral o => Integral (MSF m i o) where
 export %inline
 Fractional o => Fractional (MSF m i o) where
   (/)  = elementwise2 (/)
-
-export
-Alternative f => Alternative (MSF m i . f)
-  using Applicative.Compose where
-    empty   = const empty
-    x <|> y = fan [x,y] >>> arr (\[vx,vy] => vx <|> vy)

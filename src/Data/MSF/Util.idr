@@ -401,6 +401,10 @@ union :  Semigroup o
       -> MSF m i (Event o)
 union = (<+>)
 
+export
+(<|>) : Alternative f => MSF m i (f o) -> MSF m i (f o) -> MSF m i (f o)
+x <|> y = fan [x,y] >>> arr (\[vx,vy] => vx <|> vy)
+
 --------------------------------------------------------------------------------
 --          Filtering Event Streams
 --------------------------------------------------------------------------------
