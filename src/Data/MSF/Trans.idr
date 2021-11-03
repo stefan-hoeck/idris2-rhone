@@ -116,12 +116,12 @@ fromReader_ = morphGS (\f,ve => runReaderT ve (f ()))
 ||| Converts an MSF taking an additional input
 ||| to one with its monadic context wrapped in `ReaderT e`.
 export
-toReader : Monad m => MSF m (NP I [e,i]) o -> MSF (ReaderT e m) i o 
+toReader : Monad m => MSF m (NP I [e,i]) o -> MSF (ReaderT e m) i o
 toReader = morphGS (\f,vi => MkReaderT $ \ve => f [ve,vi])
 
 ||| Like `toReader` but for MSFs without additional input
 export
-toReader_ : Monad m => MSF m e o -> MSF (ReaderT e m) () o 
+toReader_ : Monad m => MSF m e o -> MSF (ReaderT e m) () o
 toReader_ = morphGS (\f,_ => MkReaderT f)
 
 --------------------------------------------------------------------------------

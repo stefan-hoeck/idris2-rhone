@@ -56,7 +56,7 @@ record Ball where
   vel : Velocity
 
 dispBall : NP I [Ball,Nat] -> String
-dispBall [b,n] = 
+dispBall [b,n] =
   let char = if b.vel <= 0 then '<' else '>'
    in    cursorUp1
       ++ eraseLine End

@@ -32,7 +32,7 @@ mutual
     Nil  : MSFList m [] []
     (::) :  (sf : MSF m i o)
          -> (sfs : MSFList m is os)
-         -> MSFList m (i :: is) (o :: os) 
+         -> MSFList m (i :: is) (o :: os)
 
   namespace FanList
     ||| A heterogeneous list of MSFs all of which
@@ -90,36 +90,36 @@ mutual
 
     ||| The identity MSF
     Id        :  MSF m i i
-    
+
     ||| The constant MSF
     Const     :  o -> MSF m i o
-  
+
     ||| Lifts a pure function to an MSF
     Arr       :  (i -> o) -> MSF m i o
-  
+
     ||| Lifts an effectful computation to an MSF
     Lifted    :  (i -> m o) -> MSF m i o
-  
+
     ||| Sequencing of MSFs
     Seq       :  MSF m i x -> MSF m x o -> MSF m i o
-  
+
     ||| Parallelising MSFs
     Par       :  MSFList m is os -> MSF m (NP I is) (NP I os)
-  
+
     ||| Broadcasting a value to a list of MSFs
     ||| all taking the same input
     Fan       :  FanList m i os -> MSF m i (NP I os)
-  
+
     ||| Choosing an MSF based on an n-ary sum as input
     Choice    :  MSFList m is os -> MSF m (NS I is) (NS I os)
-  
+
     ||| Choosing an MSF (all of which produce the same output)
     ||| based on an n-ary sum as input
     Collect   :  CollectList m is o -> MSF m (NS I is) o
-  
+
     ||| Feedback loops (stateful computations)
     Loop      :  s -> MSF m (NP I [s, i]) (NP I [s, o]) -> MSF m i o
-  
+
     ||| Single time switching: Upon the first event,
     ||| the second stream function is calculated,
     ||| evaluated immediately and used henceforth.
@@ -172,14 +172,14 @@ export %inline
 ||| Runs a bundle of MSFs in parallel. This is
 ||| a generalization of `(***)` from `Control.Arrow`.
 export %inline
-par : MSFList m is os -> MSF m (NP I is) (NP I os) 
+par : MSFList m is os -> MSF m (NP I is) (NP I os)
 par = Par
 
 ||| Broadcasts an input value across a list of MSFs,
 ||| all of which must accept the same type of input.
 ||| This is a generalization of `(&&&)` from `Control.Arrow`.
 export %inline
-fan : FanList m i os -> MSF m i (NP I os) 
+fan : FanList m i os -> MSF m i (NP I os)
 fan = Fan
 
 ||| Apply a binary function to the result of running
@@ -195,7 +195,7 @@ elementwise2 f x y = fan [x,y] >>> arr (\[a,b] => f a b)
 ||| Choose an MSF to run depending the input value
 ||| This is a generalization of `(+++)` from `Control.Arrow`.
 export %inline
-choice : MSFList m is os -> MSF m (NS I is) (NS I os) 
+choice : MSFList m is os -> MSF m (NS I is) (NS I os)
 choice = Choice
 
 ||| Choose an MSF all of which produce the same output.
