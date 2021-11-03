@@ -44,10 +44,10 @@ jobs:
       matrix:
         lib:
           - elab-util
-          - hedgehog
-          - pretty-show
           - sop
+          - pretty-show
           - tailrec
+          - hedgehog
         idris-version:
           - ${{ needs.read-ver.outputs.idris-ver }}
           - latest
