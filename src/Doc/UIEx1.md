@@ -1,4 +1,4 @@
-## UI Example 1 : Accumulating Button Clicks
+# UI Example 1 : Accumulating Button Clicks
 
 In this example, I'll show how to set up an MSF for describing a
 user interface with three buttons and a counter: One button
@@ -61,7 +61,7 @@ record type for representing our user interface. Our state
 will monitor for each button whether it is enabled or
 not, as well as keep track of the content of an output field
 or HTML element displaying the current counter:
-  
+
 ```idris
 record UI where
   constructor MkUI
@@ -137,7 +137,7 @@ testUI = simulate $  replicate 11 Inc
 
 And at the REPL:
 
-```
+```repl
 Doc.UIEx1> testUI
 ["MkUI { inc = True, dec = True, reset = True, out = "Count: 1" }",
  "MkUI { inc = True, dec = True, reset = True, out = "Count: 2" }",

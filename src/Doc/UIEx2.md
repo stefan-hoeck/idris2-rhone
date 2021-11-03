@@ -1,4 +1,4 @@
-## UI Input Validation
+# UI Input Validation
 
 In this tutorial, we are going to have a go at
 input validation in a graphical user interface.
@@ -22,7 +22,7 @@ import Data.So
 %default total
 ```
 
-### Specification of the UI
+## Specification of the UI
 
 Our user interface will consist of a web form with
 three text fields
@@ -166,7 +166,7 @@ namespace Ev
   print (Input f s) = #"Input \#{print f} \#{show s}"#
 ```
 
-### Setting up a Testing Environment
+## Setting up a Testing Environment
 
 As in the [previous post](UIEx1.md), we define a custom monad for
 interacting with the UI:
@@ -212,7 +212,7 @@ simulate sf es = traverse_ (putStrLn . printCommands)
                $ embed es (clear >>> sf >>> get)
 ```
 
-### First Try: Validating an MSF directly
+## First Try: Validating an MSF directly
 
 Let's give our web application a first try. Since
 all refinemend types are of the same structure, we can use
@@ -304,7 +304,7 @@ testMSF1 = simulate (onSubmit account1)
 
 And at the REPL:
 
-```
+```repl
 Doc.UIEx2> :exec testMSF1
 alias: req. input, name: req. input, age: Invalid age: 10, disable submit
 alias: req. input, name: req. input, age: Invalid age: 10, disable submit
@@ -323,7 +323,7 @@ this might lead to a lot of redraws in the DOM and decrease
 the responsiveness of the application. We therefore would like to
 only update the UI, when a *real* change of state occured.
 
-### Second Try: Validating an Event Stream
+## Second Try: Validating an Event Stream
 
 The problem of our first implementation was, that every
 path in an MSF gets re-evaluated on every input event
@@ -368,7 +368,7 @@ testMSF2 = simulate (onSubmit account2)
 
 And at the REPL:
 
-```
+```repl
 Doc.UIEx2> :exec testMSF2
 age: Invalid age: 10, disable submit
 disable submit
@@ -384,7 +384,7 @@ will not be set to *input required* initially, since
 validation of a given text field only happens
 when a user types some text into exactly this field.
 
-### Third Try: Using a custom Combinator
+## Third Try: Using a custom Combinator
 
 We already made sure that input in a text field
 is only programmatically
@@ -443,7 +443,7 @@ input :  {f : a -> Bool}
       -> MSF m Ev (Maybe b)
 input fld mk =   inputFor fld
              ^>> map (validate fld mk)
-             ^>> fireAndHold (Left InputRequired) 
+             ^>> fireAndHold (Left InputRequired)
              >>> par [ arr getRight
                      , withEffect (traverse_ $ validity fld)
                      ]
@@ -480,7 +480,7 @@ testMSF = simulate (onSubmit account)
 
 And at the REPL:
 
-```
+```repl
 Doc.UIEx2> :exec testMSF
 alias: req. input, name: req. input, age: req. input, disable submit
 age: Invalid age: 10
@@ -500,7 +500,7 @@ user interface text input events only occur after key strokes, it is highly
 unlikely that two identical input events will be fired in immediate
 succession.
 
-### Final Thoughts
+## Final Thoughts
 
 As promised, this was a rather lengthy post. If we want to make sure
 that input validation behaves correctly and no unnecessary work is

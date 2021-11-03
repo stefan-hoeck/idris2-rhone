@@ -60,7 +60,7 @@ which can change with each evaluation step*. They are typically
 used to process streams of input like the ones coming from
 a graphical user interface or other external source.
 They come with a plethora of combinators to describe
-networks of computations potentially taking their input 
+networks of computations potentially taking their input
 from many different sources.
 
 ### The Implementaion used in *rhone*
@@ -98,14 +98,14 @@ which run an MSF on a list of input values producing a list
 of output values of the same length. Just load this document
 into the REPL
 
-```
+```repl
 rlwrap idris2 --find-ipkg src/Doc/Basics.md
 ```
 
 and invoke `embedI` with a list of input values and a
 stream function:
 
-```
+```repl
 Doc.Basics> embedI ["foo", "bar"] (arr Prelude.reverse)
 ["oof", "rab"]
 ```
@@ -135,7 +135,7 @@ calc fetch pr = constM fetch >>> square ^>> show ^>> arrM pr
 We can run this at the REPL, but if we just use `Identity`
 as our context, this won't produce any interesting result:
 
-```
+```repl
 Doc.Basics> embedI [(),()] $ calc (pure 1) (const $ pure ())
 [(), ()]
 ```
@@ -163,10 +163,11 @@ putStr s = modify (record {out $= (s ::)})
 
 Let's try this:
 
-```
+```repl
 Doc.Basics> execState ini (embed [(),(),(),()] $ calc getNat putStr)
 MkAppSt 4 ["16", "9", "4", "1"]
 ```
+
 ## Static Networks: Parallelisation and Broadcasting
 
 A typical use case consists of collecting input from several sources,
