@@ -1,4 +1,25 @@
-||| Various utility combinators
+||| Various utility combinators.
+|||
+||| A note on arrow operators: Arrow operators in this module are
+||| of the form `i>o`, where `i` is either `>`, `^`, `!`, or `?`.
+||| and `o` is either `>`, `^`, `!`, or `-`. Each of these symbols
+||| describe a different type of arrow-like function at the
+||| corresponding end of the operator:
+|||
+||| The following table lists the meaning of symbols
+|||
+||| | Symbol      | Meaning                  | Example                    |
+||| |-------------|--------------------------|----------------------------|
+||| | `>`         | An MSF                   | arr (*2) >>> arrM printLn  |
+||| | `^`         | a pure function          | (*2) ^>> printLn           |
+||| | `!`         | an effectful computation | arr (*2) >>! printLn       |
+|||
+||| In addition, symbol `?` corresponds to an event stream input, and
+||| symbol `-` describes fanning out to a list of sinks:
+|||
+||| ```idris example
+||| when (> 10) ?>- [ arrM printLn, put ]
+||| ```
 module Data.MSF.Util
 
 import Data.List
@@ -10,7 +31,7 @@ import Data.SOP
 --          Sequencing Utilities
 --------------------------------------------------------------------------------
 
-infixr 1 >>^, ^>>, >>!, !>>
+infixr 1 ^>>, >>^, >>!, !>>, ?>>, >>-, ^>-, !>-, ?>-
 
 ||| Sequencing of an MSF and a pure function
 export %inline
@@ -46,6 +67,21 @@ f !>> sf = arrM f >>> sf
 export %inline
 fan_ : FanList m i os -> MSF m i ()
 fan_ sfs = Fan sfs >>> Const ()
+
+||| Broadcasting an MSF to a list of sinks
+export %inline
+(>>-) : MSF m i x -> FanList m x os -> MSF m i ()
+sf >>- sfs = sf >>> fan_ sfs
+
+||| Broadcasting a pure function to a list of sinks
+export %inline
+(^>-) : (i -> x) -> FanList m x os -> MSF m i ()
+f ^>- sfs = arr f >>> fan_ sfs
+
+||| Broadcasting an effectful computation to a list of sinks
+export %inline
+(!>-) : (i -> m x) -> FanList m x os -> MSF m i ()
+f !>- sfs = arrM f >>> fan_ sfs
 
 ||| Extract the first argument from an MSF taking a pair
 ||| of input values.
@@ -308,6 +344,16 @@ export
 ifEvent : Monoid o => MSF m i o -> MSF m (Event i) o
 ifEvent sf = event >>> collect [sf, const neutral]
 
+||| Broadcast an event to a list of sinks.
+export %inline
+(?>-) : MSF m i (Event x) -> FanList m x os -> MSF m i ()
+ef ?>- sfs = ef >>> ifEvent (fan_ sfs)
+
+||| Run the given MSF if the input stream fires and event.
+export %inline
+(?>>) : Monoid o => MSF m i (Event x) -> MSF m x o -> MSF m i o
+ef ?>> sf = ef >>> ifEvent sf
+
 ||| Run the given MSF only if the input fired no event.
 export
 ifNoEvent : Monoid o => MSF m () o -> MSF m (Event i) o
@@ -439,3 +485,25 @@ accumulateWithE f ini = feedback ini (arr g)
 export
 countE : MSF m (Event i) (Event Nat)
 countE = accumulateWithE (\_,n => n + 1) 0
+
+--------------------------------------------------------------------------------
+--          Handling with n-ary Products
+--------------------------------------------------------------------------------
+
+||| N-ary function type calculated from a list of n types.
+public export
+0 Fun : List Type -> Type -> Type
+Fun [] r        = r
+Fun (t :: ts) r = t -> Fun ts r
+
+||| Converts an n-ary function to one taking an n-ary
+||| product as input.
+export
+uncurryNP : {0 is : _} -> Fun is o -> NP I is -> o
+uncurryNP r []        = r
+uncurryNP f (v :: vs) = uncurryNP (f v) vs
+
+||| Alias for `arr . uncurryNP`.
+export
+np : {0 is : _} -> Fun is o -> MSF m (NP I is) o
+np = arr . uncurryNP
