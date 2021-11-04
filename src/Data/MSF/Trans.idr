@@ -76,7 +76,15 @@ fromState : Monad m => MSF (StateT s m) i o -> MSF m (NP I [s,i]) (NP I [s,o])
 fromState =
   morphGS (\f,[vs,vi] => (\(vs2,vo,vc) => ([vs2,vo],vc)) <$> runStateT vs (f vi))
 
-||| Like `unState` but drops the uninteresting unit in- and output.
+||| Runs the given stateful MSF as a feedback loop with `ini` as the
+||| initial input.
+|||
+||| This is a shorthand for `feedback ini . fromState`.
+export
+loopState : Monad m => (ini : s) -> MSF (StateT s m) i o -> MSF m i o
+loopState ini = feedback ini . fromState
+
+||| Like `fromState` but drops the uninteresting unit in- and output.
 export
 fromState_ : Monad m => MSF (StateT s m) () () -> MSF m s s
 fromState_ = morphGS (\f,vs => (\(vs2,_,vc) => (vs2,vc)) <$> runStateT vs (f ()))
@@ -107,6 +115,13 @@ ask = constM ask
 export
 fromReader : Monad m => MSF (ReaderT e m) i o -> MSF m (NP I [e,i]) o
 fromReader = morphGS (\f,[ve,vi] => runReaderT ve (f vi))
+
+||| Converts the given MSF to use `env` as its environment.
+|||
+||| This is an alias for `fan [ const env, id ] >>> fromReader sf`.
+export
+withEnv : Monad m => (env : e) -> (sf : MSF (ReaderT e m) i o) -> MSF m i o
+withEnv env sf = fan [ const env, id ] >>> fromReader sf
 
 ||| Like `unReader` but drops the uninteresting unit input.
 export
