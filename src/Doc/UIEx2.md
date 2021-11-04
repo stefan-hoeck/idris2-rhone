@@ -519,3 +519,6 @@ will fire before the user of our application even had a chance to
 press the first key or click the first button. Setting up the
 initial state of the UI should happen during this first step of
 evaluation.
+
+<!-- vi: filetype=idris2
+-->

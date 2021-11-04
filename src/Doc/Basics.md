@@ -393,3 +393,6 @@ ballGame dt ini = fan [time, ball ini] >>^ dispBall
 testBallGame : List String
 testBallGame = embedI (replicate 10 ()) (ballGame (Id 1) $ MkBall 500 0)
 ```
+
+<!-- vi: filetype=idris2
+-->

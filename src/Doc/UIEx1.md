@@ -164,3 +164,6 @@ Doc.UIEx1> testUI
  "MkUI { inc = True, dec = False, reset = True, out = "Count: -10" }",
  "Ignored invalid input: Dec"]
 ```
+
+<!-- vi: filetype=idris2
+-->
