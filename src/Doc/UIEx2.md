@@ -131,7 +131,7 @@ record Account where
 namespace Account
   export
   print : Account -> String
-  print (MkAccount a n g) = #"{\#{a.value}, \#{n.value}, \#{show g.value}}"#
+  print (MkAccount a n g) = "{\{a.value}, \{n.value}, \{show g.value}}"
 ```
 
 We also need to specify the type of input events
@@ -163,7 +163,7 @@ namespace Ev
   export
   print : Ev -> String
   print Submit      = "Submit"
-  print (Input f s) = #"Input \#{print f} \#{show s}"#
+  print (Input f s) = "Input \{print f} \{show s}"
 ```
 
 ## Setting up a Testing Environment
@@ -194,8 +194,8 @@ log s = modify (s ::)
 Monad m => MonadUI (StateT (List String) m) where
   enableSubmit True  =log "enable submit"
   enableSubmit False =log "disable submit"
-  validity f v       =log #"\#{print f}: \#{print v}"#
-  submit acc         =log #"submit: \#{print acc}"#
+  validity f v       =log "\{print f}: \{print v}"
+  submit acc         =log "submit: \{print acc}"
 ```
 
 In order to get one line of logging output for each input
@@ -227,7 +227,7 @@ validate :  {f : a -> Bool}
          -> Either Invalid b
 validate fld mk s =
   let va  = cast {to = a} s
-      msg = #"Invalid \#{print fld}: \#{s}"#
+      msg = "Invalid \{print fld}: \{s}"
    in case choose (f va) of
         Left oh => Right $ mk va oh
         Right _ => Left $ if s == "" then InputRequired else Msg msg
@@ -282,9 +282,7 @@ clicked and all text fields contain valid input.
 
 ```idris
 onSubmit : MonadUI m => MSF m Ev (Maybe Account) -> MSF m Ev ()
-onSubmit sf =   fan [sf, when_ isSubmit]
-            >>> justOnEvent
-            >>> ifEvent (arrM submit)
+onSubmit sf = fan [sf, when_ isSubmit] >>> justOnEvent ?>> arrM submit
 ```
 
 We are ready to try out the first version of our
@@ -462,7 +460,7 @@ account =    MkAccount
         <$$> input FAlias MkAlias
         <**> input FName  MkName
         <**> input FAge   MkAge
-        >>>  observeWith (isJust ^>> onChange >>> ifEvent (arrM enableSubmit))
+        >>>  observeWith (isJust ^>> onChange ?>> arrM enableSubmit)
 
 testMSF : IO ()
 testMSF = simulate (onSubmit account)
