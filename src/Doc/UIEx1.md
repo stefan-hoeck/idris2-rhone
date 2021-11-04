@@ -126,7 +126,7 @@ simulate : List Input -> List String
 simulate evs = evalState ini . embed evs
              $ onInput >>> collect
                  [ msf >>> get >>^ show
-                 , arr $ \i => #"Ignored invalid input: \#{show i}"#
+                 , arr $ \i => "Ignored invalid input: \{show i}"
                  ]
 
 testUI : List String
