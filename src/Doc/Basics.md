@@ -205,10 +205,10 @@ toColor Mdl = "green"
 
 mouse : (log : String -> m ()) -> MSF m (NP I [Int16,Int16,Button]) String
 mouse log =
-  par [ withEffect (\x => log #"x: \#{show x}"#) >>^ (*2)
-      , withEffect (\y => log #"y: \#{show y}"#) >>^ (+10)
+  par [ withEffect (\x => log "x: \{show x}") >>^ (*2)
+      , withEffect (\y => log "y: \{show y}") >>^ (+10)
       , withEffect (log . show) >>^ toColor
-      ] >>^ (\[x,y,c] => #"x: \#{show x}, y: \#{show y}, c: \#{c}"#)
+      ] >>^ (\[x,y,c] => "x: \{show x}, y: \{show y}, c: \{c}")
 
 runMouse : List (NP I [Int16,Int16,Button]) -> (AppSt, List String)
 runMouse ps = runState ini $ embed ps (mouse putStr)
@@ -236,7 +236,7 @@ temp log =
   fan [ withEffect (log . show)
       , arr toCelsius
       , arr toFahrenheit ] >>^
-  (\[k,c,f] => #"\#{show k} K, \#{show c} °C, \#{show f} °F"#)
+  (\[k,c,f] => "\{show k} K, \{show c} °C, \{show f} °F")
 
 runTemp : List Double -> (AppSt, List String)
 runTemp vs = runState ini $ embed vs (temp putStr)
@@ -380,15 +380,16 @@ record Ball where
   vel : Velocity
 
 ball : m DTime => (ini : Ball) -> MSF m i Ball
-ball ini =   const g >>> velocity ini.vel
+ball ini =   const g
+         >>> velocity ini.vel
          >>> fan [position ini.pos, id]
-         >>^ (\[p,v] => MkBall p v)
+         >>> np MkBall
 
 ballGame : m DTime -> (ini : Ball) -> MSF m i String
-ballGame dt ini = fan [time, ball ini] >>^ dispBall
-  where dispBall : NP I [Time,Ball] -> String
-        dispBall [t,MkBall p v] =
-          #"t: \#{show t}; y: \#{show p}; v: \#{show v}"#
+ballGame dt ini = fan [time, ball ini] >>> np dispBall
+  where dispBall : Time -> Ball -> String
+        dispBall t (MkBall p v) =
+          "t: \{show t}; y: \{show p}; v: \{show v}"
 
 testBallGame : List String
 testBallGame = embedI (replicate 10 ()) (ballGame (Id 1) $ MkBall 500 0)
