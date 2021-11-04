@@ -485,3 +485,25 @@ accumulateWithE f ini = feedback ini (arr g)
 export
 countE : MSF m (Event i) (Event Nat)
 countE = accumulateWithE (\_,n => n + 1) 0
+
+--------------------------------------------------------------------------------
+--          Handling with n-ary Products
+--------------------------------------------------------------------------------
+
+||| N-ary function type calculated from a list of n types.
+public export
+0 Fun : List Type -> Type -> Type
+Fun [] r        = r
+Fun (t :: ts) r = t -> Fun ts r
+
+||| Converts an n-ary function to one taking an n-ary
+||| product as input.
+export
+uncurryNP : {0 is : _} -> Fun is o -> NP I is -> o
+uncurryNP r []        = r
+uncurryNP f (v :: vs) = uncurryNP (f v) vs
+
+||| Alias for `arr . uncurryNP`.
+export
+np : {0 is : _} -> Fun is o -> MSF m (NP I is) o
+np = arr . uncurryNP
