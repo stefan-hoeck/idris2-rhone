@@ -305,13 +305,13 @@ when_ f = arr $ \vi => toEvent (f vi) ()
 
 ||| Fire an event whenever the input equals the given value.
 export
-is : Eq i => i -> MSF m i (Event ())
-is v = when_ (v ==)
+is : Eq i => i -> MSF m i (Event i)
+is v = when (v ==)
 
 ||| Fire an event whenever the input does not equal the given value.
 export
-isNot : Eq i => i -> MSF m i (Event ())
-isNot v = when_ (v /=)
+isNot : Eq i => i -> MSF m i (Event i)
+isNot v = when (v /=)
 
 ||| Fire an event if the input is a `Left`.
 export
