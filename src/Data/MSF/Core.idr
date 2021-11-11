@@ -255,3 +255,7 @@ Integral o => Integral (MSF m i o) where
 export %inline
 Fractional o => Fractional (MSF m i o) where
   (/)  = elementwise2 (/)
+
+export %inline
+FromString o => FromString (MSF m i o) where
+  fromString = const . fromString
