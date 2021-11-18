@@ -34,16 +34,16 @@ and for running the tests.
 The latest commit has been built against Idris 2 of version set in the ``.idris-version`` file.
 This file contains a version in the format which ``git describe --tags`` gives.
 
-#### Core Library
+### Core Library
 
 * [idris2-sop](https://github.com/stefan-hoeck/idris2-sop)
 
-#### Documentation
+### Docs
 
 * [idris2-elab-util](https://github.com/stefan-hoeck/idris2-elab-util)
 * [idris2-sop](https://github.com/stefan-hoeck/idris2-sop)
 
-#### Testing
+### Testing
 
 * [idris2-elab-util](https://github.com/stefan-hoeck/idris2-elab-util)
 * [idris2-sop](https://github.com/stefan-hoeck/idris2-sop)
@@ -63,4 +63,3 @@ When I started experimenting with AFRP in Idris2, I was in the
 Swiss canton of Wallis, where the river Rhône (Rhone in German)
 has its source, so I thought this would be a fitting name
 for this library.
-
