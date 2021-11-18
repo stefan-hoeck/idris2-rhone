@@ -31,6 +31,9 @@ we use the sum and product types for them *idris2-sop* project.
 There are additional prerequisites for building the documentation
 and for running the tests.
 
+The latest commit has been built against Idris 2 of version set in the ``.idris-version`` file.
+This file contains a version in the format which ``git describe --tags`` gives.
+
 #### Core Library
 
 * [idris2-sop](https://github.com/stefan-hoeck/idris2-sop)
