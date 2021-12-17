@@ -155,10 +155,10 @@ Eff : Type -> Type
 Eff = State AppSt
 
 getNat : Eff Nat
-getNat = modify (record {num $= S}) >> map num get
+getNat = modify {num $= S} >> map num get
 
 putStr : String -> Eff ()
-putStr s = modify (record {out $= (s ::)})
+putStr s = modify {out $= (s ::)}
 ```
 
 Let's try this:

@@ -76,10 +76,10 @@ ini = MkUI True True True ""
 %runElab derive "UI" [Generic,Meta,Eq,Show]
 
 MonadUI (State UI) where
-  disableInc   b = modify $ record { inc = not b }
-  disableDec   b = modify $ record { dec = not b }
-  disableReset b = modify $ record { reset = not b }
-  dispCount    n = modify $ record { out = #"Count: \#{show n}"# }
+  disableInc   b = modify { inc := not b }
+  disableDec   b = modify { dec := not b }
+  disableReset b = modify { reset := not b }
+  dispCount    n = modify { out := #"Count: \#{show n}"# }
 ```
 
 Finally, we use a data type for simulating user
