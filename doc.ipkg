@@ -2,7 +2,6 @@ package rhone-doc
 version    = 0.0.1
 authors    = "Stefan Höck"
 depends    = base      >= 0.5.1
-           , contrib   >= 0.5.1
            , elab-util >= 0.5.0
            , sop       >= 0.5.0
 
