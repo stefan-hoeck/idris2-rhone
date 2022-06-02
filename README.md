@@ -31,8 +31,13 @@ we use the sum and product types for them *idris2-sop* project.
 There are additional prerequisites for building the documentation
 and for running the tests.
 
-The latest commit has been built against Idris 2 of version set in the ``.idris-version`` file.
-This file contains a version in the format which ``git describe --tags`` gives.
+The latest commit is daily tested to build against the current
+HEAD of the Idris compiler. Since Idris2 releases are happening
+rather infrequently at the moment, it is suggested to use
+a package manager like [pack](https://github.com/stefan-hoeck/idris2-pack)
+to install and maintain matching versions of the Idris compiler
+and this library. Pack will also automatically install all
+required dependencies.
 
 ### Core Library
 
