@@ -52,6 +52,12 @@ jobs:
           repository: stefan-hoeck/idris2-hedgehog
       - name: Install hedgehog
         run: make install
+      - name: Checkout tailrec
+        uses: actions/checkout@v2
+        with:
+          repository: stefan-hoeck/idris2-tailrec
+      - name: Install tailrec
+        run: make install
       - name: Checkout
         uses: actions/checkout@v2
       - name: Build lib
