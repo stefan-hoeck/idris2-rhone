@@ -1,6 +1,7 @@
 package rhone
 version    = 0.0.1
-authors    = "Stefan Höck"
+authors    = "stefan-hoeck"
+brief      = "Arrowized functional reactive programming in Idris2"
 depends    = base    >= 0.5.1
            , sop     >= 0.5.0
 
