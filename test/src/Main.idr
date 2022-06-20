@@ -1,6 +1,6 @@
-module Test.Main
+module Main
 
-import Test.Basics
+import Basics
 import Hedgehog
 
 main : IO ()

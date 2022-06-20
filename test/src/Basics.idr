@@ -1,4 +1,4 @@
-module Test.Basics
+module Basics
 
 import Control.Monad.Identity
 import Data.List
