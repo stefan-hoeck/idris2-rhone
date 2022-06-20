@@ -22,7 +22,7 @@ introduced in this library.
 There is a growing list of pretty detailed tutorials
 in the `src/Doc` folder. For an introduction to the basic
 concepts and arrowized functional reactive programme,
-[start here](src/Doc/Basics.md).
+[start here](docs/src/Docs/Basics.md).
 
 ## Dependencies
 
