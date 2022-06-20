@@ -1,6 +1,6 @@
 ||| This module can be used to run an SF for a long time
 ||| as quickly as possible to check for memory leaks.
-module Test.Leak
+module Leak
 
 import Control.ANSI.CSI
 import Control.Monad.Identity

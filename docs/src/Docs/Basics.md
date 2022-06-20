@@ -13,7 +13,7 @@ that field.
 This is a literate Idris2 file, so we need some imports first:
 
 ```idris
-module Doc.Basics
+module Docs.Basics
 
 import Control.Monad.State
 import Data.MSF
@@ -99,14 +99,14 @@ of output values of the same length. Just load this document
 into the REPL
 
 ```repl
-rlwrap idris2 --find-ipkg src/Doc/Basics.md
+rlwrap idris2 --find-ipkg src/Docs/Basics.md
 ```
 
 and invoke `embedI` with a list of input values and a
 stream function:
 
 ```repl
-Doc.Basics> embedI ["foo", "bar"] (arr Prelude.reverse)
+Docs.Basics> embedI ["foo", "bar"] (arr Prelude.reverse)
 ["oof", "rab"]
 ```
 
@@ -136,7 +136,7 @@ We can run this at the REPL, but if we just use `Identity`
 as our context, this won't produce any interesting result:
 
 ```repl
-Doc.Basics> embedI [(),()] $ calc (pure 1) (const $ pure ())
+Docs.Basics> embedI [(),()] $ calc (pure 1) (const $ pure ())
 [(), ()]
 ```
 
@@ -164,7 +164,7 @@ putStr s = modify {out $= (s ::)}
 Let's try this:
 
 ```repl
-Doc.Basics> execState ini (embed [(),(),(),()] $ calc getNat putStr)
+Docs.Basics> execState ini (embed [(),(),(),()] $ calc getNat putStr)
 MkAppSt 4 ["16", "9", "4", "1"]
 ```
 

@@ -14,7 +14,7 @@ allowing us to test the functionality of our MSF
 in a pure environment.
 
 ```idris
-module Doc.UIEx1
+module Docs.UIEx1
 
 import Control.Monad.State
 import Data.MSF
@@ -138,7 +138,7 @@ testUI = simulate $  replicate 11 Inc
 And at the REPL:
 
 ```repl
-Doc.UIEx1> testUI
+Docs.UIEx1> testUI
 ["MkUI { inc = True, dec = True, reset = True, out = "Count: 1" }",
  "MkUI { inc = True, dec = True, reset = True, out = "Count: 2" }",
  "MkUI { inc = True, dec = True, reset = True, out = "Count: 3" }",

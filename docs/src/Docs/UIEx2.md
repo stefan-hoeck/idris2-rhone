@@ -7,7 +7,7 @@ this (and we should!), this is by no means trivial,
 so be prepared for a lengthier post.
 
 ```idris
-module Doc.UIEx2
+module Docs.UIEx2
 
 import Control.Applicative.Syntax
 import Control.Monad.Identity
@@ -303,7 +303,7 @@ testMSF1 = simulate (onSubmit account1)
 And at the REPL:
 
 ```repl
-Doc.UIEx2> :exec testMSF1
+Docs.UIEx2> :exec testMSF1
 alias: req. input, name: req. input, age: Invalid age: 10, disable submit
 alias: req. input, name: req. input, age: Invalid age: 10, disable submit
 alias: req. input, name: valid, age: Invalid age: 10, disable submit
@@ -367,7 +367,7 @@ testMSF2 = simulate (onSubmit account2)
 And at the REPL:
 
 ```repl
-Doc.UIEx2> :exec testMSF2
+Docs.UIEx2> :exec testMSF2
 age: Invalid age: 10, disable submit
 disable submit
 name: valid, disable submit
@@ -479,7 +479,7 @@ testMSF = simulate (onSubmit account)
 And at the REPL:
 
 ```repl
-Doc.UIEx2> :exec testMSF
+Docs.UIEx2> :exec testMSF
 alias: req. input, name: req. input, age: req. input, disable submit
 age: Invalid age: 10
 age: Invalid age: 10
