@@ -165,5 +165,5 @@ Docs.UIEx1> testUI
  "Ignored invalid input: Dec"]
 ```
 
-<!-- vi: filetype=idris2
+<!-- vi: filetype=idris2:syntax=markdown
 -->
