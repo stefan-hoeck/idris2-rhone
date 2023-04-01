@@ -19,7 +19,7 @@ module Docs.UIEx1
 import Control.Monad.State
 import Data.MSF
 import Data.MSF.Trans
-import Generics.Derive
+import Derive.Prelude
 
 %language ElabReflection
 %default total
@@ -73,7 +73,7 @@ record UI where
 ini : UI
 ini = MkUI True True True ""
 
-%runElab derive "UI" [Generic,Meta,Eq,Show]
+%runElab derive "UI" [Eq,Show]
 
 MonadUI (State UI) where
   disableInc   b = modify { inc := not b }
@@ -88,7 +88,7 @@ interactions: An enum describing the button a user clicked:
 ```idris
 data Input = Inc | Dec | Reset
 
-%runElab derive "Input" [Generic,Meta,Eq,Show]
+%runElab derive "Input" [Eq,Show]
 ```
 
 However, when we simulate the UI, we don't want to
@@ -102,14 +102,14 @@ invalid input will be kept unmodified for logging
 purposes:
 
 ```idris
-onInput : MSF (State UI) Input (NS I [Ev,Input])
+onInput : MSF (State UI) Input (HSum [Ev,Input])
 onInput = fan [get, id] >>> bool valid >>> choice [arr toFun, snd]
-  where valid : NP I [UI,Input] -> Bool
+  where valid : HList [UI,Input] -> Bool
         valid [ui,Inc]   = ui.inc
         valid [ui,Dec]   = ui.dec
         valid [ui,Reset] = ui.reset
 
-        toFun : NP I [UI,Input] -> Int8 -> Int8
+        toFun : HList [UI,Input] -> Int8 -> Int8
         toFun [_,Inc  ] = (+  1)
         toFun [_,Dec  ] = (+ -1)
         toFun [_,Reset] = const 0

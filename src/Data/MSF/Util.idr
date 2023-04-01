@@ -23,10 +23,7 @@
 module Data.MSF.Util
 
 import Data.List
-import Data.List.Elem
 import Data.MSF.Core
-import Data.MSF.Event
-import Data.SOP
 
 --------------------------------------------------------------------------------
 --          Sequencing Utilities
@@ -87,33 +84,33 @@ f !>- sfs = arrM f >>> fan_ sfs
 ||| Extract the first argument from an MSF taking a pair
 ||| of input values.
 export
-firstArg : MSF m (NP I [x,i]) o -> x -> MSF m i o
+firstArg : MSF m (HList [x,i]) o -> x -> MSF m i o
 firstArg sf vx = fan [const vx, id] >>> sf
 
 ||| Extract the second argument from an MSF taking a pair
 ||| of input values.
 export
-secondArg : MSF m (NP I [i,x]) o -> x -> MSF m i o
+secondArg : MSF m (HList [i,x]) o -> x -> MSF m i o
 secondArg sf vx = fan [id, const vx] >>> sf
 
 ||| Extract the first value of an n-ary product
 export
-hd : MSF m (NP I (i :: t)) i
-hd = arr hd
+hd : MSF m (HList (i :: t)) i
+hd = arr $ \(h::_) => h
 
 ||| Extract the tail of an n-ary product
 export
-tl : MSF m (NP I (i :: t)) (NP I t)
-tl = arr tl
+tl : MSF m (HList (i :: t)) (HList t)
+tl = arr $ \(_::t) => t
 
 ||| Extract the second value of an n-ary product
 export
-snd : MSF m (NP I (i :: i2 :: t)) i2
+snd : MSF m (HList (i :: i2 :: t)) i2
 snd = arr $ \(_ :: v :: _) => v
 
 ||| Swaps a pair of input values
 export
-swap : MSF m (NP I [a,b]) (NP I [b,a])
+swap : MSF m (HList [a,b]) (HList [b,a])
 swap = arr $ \[va,vb] => [vb,va]
 
 --------------------------------------------------------------------------------
@@ -123,8 +120,8 @@ swap = arr $ \[va,vb] => [vb,va]
 ||| Convert an `Either` input to a binary sum, which
 ||| can then be sequenced with a call to `choice` or `collect`.
 export
-either : MSF m (Either i1 i2) (NS I [i1,i2])
-either = arr $ either Z (S . Z)
+either : MSF m (Either i1 i2) (HSum [i1,i2])
+either = arr $ either Here (There . Here)
 
 ||| Run the given MSF only if the input is a `Left`.
 export
@@ -139,8 +136,8 @@ ifRight sf = either >>> collect [neutral, sf]
 ||| Convert an `Maybe` input to a binary sum, which
 ||| can then be sequenced with a call to `choice` or `collect`.
 export
-maybe :  MSF m (Maybe i) (NS I [i,()])
-maybe = arr $ maybe (S $ Z ()) Z
+maybe :  MSF m (Maybe i) (HSum [i,()])
+maybe = arr $ maybe (There $ Here ()) Here
 
 ||| Run the given MSF only if the input is a `Just`.
 export
@@ -156,8 +153,8 @@ ifNothing sf = maybe >>> collect [neutral, sf]
 ||| the given predicate returns `True` or `False`. The result
 ||| can then be sequenced with a call to `choice` or `collect`.
 export
-bool : (f : i -> Bool) -> MSF m i (NS I [i,i])
-bool f = arr $ \vi => if f vi then Z vi else (S $ Z vi)
+bool : (f : i -> Bool) -> MSF m i (HSum [i,i])
+bool f = arr $ \vi => if f vi then Here vi else (There $ Here vi)
 
 ||| Run the given MSF only if the predicate holds for the input.
 export
@@ -186,7 +183,7 @@ ifIsNot v = ifFalse (v ==)
 ||| Uses the given value as a seed for feeding back output
 ||| of the MSF back to its input.
 export
-feedback_ : s -> MSF m (NP I [s,i]) s -> MSF m i ()
+feedback_ : s -> MSF m (HList [s,i]) s -> MSF m i ()
 feedback_ v sf = feedback v $ sf >>^ (:: [()])
 
 ||| Delay a stream by one sample.
@@ -199,7 +196,7 @@ iPre v = feedback v swap
 export
 accumulateWith : (i -> o -> o) -> o -> MSF m i o
 accumulateWith f ini = feedback ini (arr g)
-  where g : NP I [o,i] -> NP I [o,o]
+  where g : HList [o,i] -> HList [o,o]
         g [acc,inp] = let acc' = f inp acc in [acc',acc']
 
 ||| Counts the number of scans of the signal function.
@@ -220,14 +217,14 @@ append = appendFrom neutral
 ||| Applies a transfer function to the input and an accumulator,
 ||| returning the updated accumulator and output.
 export
-mealy : (i -> s -> NP I [s,o]) -> s -> MSF m i o
+mealy : (i -> s -> HList [s,o]) -> s -> MSF m i o
 mealy f s0 = feedback s0 (arr $ \[s,i] => f i s)
 
 ||| Unfolds a function over an initial state
 ||| value.
 export
-unfold : (s -> NP I [s,o]) -> s -> MSF m i o
-unfold f ini = feedback ini (arr $ f . hd)
+unfold : (s -> HList [s,o]) -> s -> MSF m i o
+unfold f ini = feedback ini (arr $ \(h::_) => f h)
 
 ||| Generates output using a step-wise generation function and an initial
 ||| value. Version of 'unfold' in which the output and the new accumulator
@@ -240,7 +237,7 @@ repeatedly f = unfold $ \vo => let vo2 = f vo in [vo2,vo2]
 export
 cycle : (vs : List o) -> {auto 0 prf : NonEmpty vs} -> MSF m i o
 cycle (h :: t) = unfold next (h :: t)
-  where next : List o -> NP I [List o, o]
+  where next : List o -> HList [List o, o]
         next Nil        = [t,h]
         next (h' :: t') = [t',h']
 
@@ -283,7 +280,7 @@ hold = accumulateWith (\ev,v => fromEvent v ev)
 export
 ntimes : Nat -> o -> MSF m i (Event o)
 ntimes n vo = Switch (feedback n $ arr next) (const never)
-  where next : NP I [Nat,i] -> NP I [Nat,Either () (Event o)]
+  where next : HList [Nat,i] -> HList [Nat,Either () (Event o)]
         next [0,_]   = [0, Left ()]
         next [S k,_] = [k, Right $ Ev vo]
 
@@ -336,8 +333,8 @@ whenNothing = arr $ maybe (Ev ()) (const NoEv)
 ||| Convert an `Event` input to a binary sum, which
 ||| can then be sequenced with a call to `choice` or `collect`.
 export
-event :  MSF m (Event i) (NS I [i,()])
-event = arr $ event (S $ Z ()) Z
+event :  MSF m (Event i) (HSum [i,()])
+event = arr $ event (There $ Here ()) Here
 
 ||| Run the given MSF only if the input fired an event.
 export
@@ -364,7 +361,7 @@ ifNoEvent sf = event >>> collect [const neutral, sf]
 export
 onChange : Eq i => MSF m i (Event i)
 onChange = mealy accum  NoEv
-  where accum : i -> Event i -> NP I [Event i, Event i]
+  where accum : i -> Event i -> HList [Event i, Event i]
         accum v old =
           let ev = Ev v
            in if ev == old then [ev,NoEv] else [ev,ev]
@@ -372,20 +369,20 @@ onChange = mealy accum  NoEv
 ||| Fires the first input as an event whenever the
 ||| second input fires.
 export
-onEvent : MSF m (NP I [a, Event e]) (Event a)
+onEvent : MSF m (HList [a, Event e]) (Event a)
 onEvent = arr $ \case [va,e] => e $> va
 
 ||| Combines the first input with the event fired by the
 ||| second input.
 export
-onEventWith : (a -> e -> b) -> MSF m (NP I [a, Event e]) (Event b)
+onEventWith : (a -> e -> b) -> MSF m (HList [a, Event e]) (Event b)
 onEventWith f = arr $ \case [va,e] => f va <$> e
 
 ||| Combines an input event stream with a stream function
 ||| holding an `Either` trying to extract a `Left` whenever
 ||| an event is fired.
 export
-leftOnEvent : MSF m (NP I [Either a b, Event e]) (Event a)
+leftOnEvent : MSF m (HList [Either a b, Event e]) (Event a)
 leftOnEvent = arr $ \case [Left va,e] => e $> va
                           _           => NoEv
 
@@ -393,7 +390,7 @@ leftOnEvent = arr $ \case [Left va,e] => e $> va
 ||| holding an `Either` trying to extract a `Right` whenever
 ||| an event is fired.
 export
-rightOnEvent : MSF m (NP I [Either a b, Event e]) (Event b)
+rightOnEvent : MSF m (HList [Either a b, Event e]) (Event b)
 rightOnEvent = arr $ \case [Right vb,e] => e $> vb
                            _            => NoEv
 
@@ -401,7 +398,7 @@ rightOnEvent = arr $ \case [Right vb,e] => e $> vb
 ||| holding a `Maybe` trying to extract the value from a `Just` whenever
 ||| an event is fired.
 export
-justOnEvent : MSF m (NP I [Maybe a, Event e]) (Event a)
+justOnEvent : MSF m (HList [Maybe a, Event e]) (Event a)
 justOnEvent = arr $ \case [Just va,e] => e $> va
                           _           => NoEv
 
@@ -470,8 +467,8 @@ mapMaybe = arr . mapMaybe
 ||| Sum projection: Fires an event if a value of the given type can
 ||| be extracted from the input sum.
 export
-proj : (0 t : k) -> {auto prf : Elem t ks} -> MSF m (NS f ks) (Event $ f t)
-proj t = arr (\ns => maybeToEvent $ extract t ns)
+proj : (0 t : k) -> {auto prf : Elem t ks} -> MSF m (Any f ks) (Event $ f t)
+proj t = arr (project t)
 
 --------------------------------------------------------------------------------
 --          Observing Event Streams
@@ -492,7 +489,7 @@ observeEvent = observeWith . ifEvent
 export
 accumulateWithE : (i -> o -> o) -> o -> MSF m (Event i) (Event o)
 accumulateWithE f ini = feedback ini (arr g)
-  where g : NP I [o,Event i] -> NP I [o,Event o]
+  where g : HList [o,Event i] -> HList [o,Event o]
         g [acc,NoEv]  = [acc,NoEv]
         g [acc,Ev vi] = let acc' = f vi acc in [acc',Ev acc']
 
@@ -514,11 +511,11 @@ Fun (t :: ts) r = t -> Fun ts r
 ||| Converts an n-ary function to one taking an n-ary
 ||| product as input.
 export
-uncurryNP : {0 is : _} -> Fun is o -> NP I is -> o
+uncurryNP : {0 is : _} -> Fun is o -> HList is -> o
 uncurryNP r []        = r
 uncurryNP f (v :: vs) = uncurryNP (f v) vs
 
 ||| Alias for `arr . uncurryNP`.
 export
-np : {0 is : _} -> Fun is o -> MSF m (NP I is) o
+np : {0 is : _} -> Fun is o -> MSF m (HList is) o
 np = arr . uncurryNP

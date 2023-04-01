@@ -18,7 +18,7 @@ module Docs.Basics
 import Control.Monad.State
 import Data.MSF
 import Data.Nat
-import Generics.Derive
+import Derive.Prelude
 
 %language ElabReflection
 %default total
@@ -190,27 +190,28 @@ list syntax and the ability to easily make use of type-level
 computations. We therefore use a special heterogeneous
 list type `Data.MSF.MSFList` for defining lists of
 monadic stream functions and run them in parallel.
-Instead of pairs, we use the n-ary products from the *sop*
+Instead of pairs, we use the n-ary products from
+module `Data.List.Quantifiers` in the *base*
 library as the resulting input and output types.
 
 ```idris
 data Button = Lft | Rgt | Mdl
 
-%runElab derive "Button" [Generic,Meta,Show,Eq]
+%runElab derive "Button" [Show,Eq]
 
 toColor : Button -> String
 toColor Lft = "red"
 toColor Rgt = "blue"
 toColor Mdl = "green"
 
-mouse : (log : String -> m ()) -> MSF m (NP I [Int16,Int16,Button]) String
+mouse : (log : String -> m ()) -> MSF m (HList [Int16,Int16,Button]) String
 mouse log =
   par [ withEffect (\x => log "x: \{show x}") >>^ (*2)
       , withEffect (\y => log "y: \{show y}") >>^ (+10)
       , withEffect (log . show) >>^ toColor
       ] >>^ (\[x,y,c] => "x: \{show x}, y: \{show y}, c: \{c}")
 
-runMouse : List (NP I [Int16,Int16,Button]) -> (AppSt, List String)
+runMouse : List (HList [Int16,Int16,Button]) -> (AppSt, List String)
 runMouse ps = runState ini $ embed ps (mouse putStr)
 ```
 
@@ -260,32 +261,32 @@ record MouseClick where
   y   : Int32
   btn : Button
 
-%runElab derive "MouseClick" [Generic,Meta,Show,Eq]
+%runElab derive "MouseClick" [Show,Eq]
 
 record Key where
   constructor MkKey
   c     : Char
   shift : Bool
 
-%runElab derive "Key" [Generic,Meta,Show,Eq]
+%runElab derive "Key" [Show,Eq]
 
 record Input where
   constructor MkInput
   value : String
 
-%runElab derive "Input" [Generic,Meta,Show,Eq]
+%runElab derive "Input" [Show,Eq]
 
 events :  (out : String -> m ())
-       -> MSF m (NS I [MouseClick,Key,Input]) (NS I [Button,Char,String])
+       -> MSF m (HSum [MouseClick,Key,Input]) (HSum [Button,Char,String])
 events out = choice
   [ withEffect (out . show) >>^ btn
   , withEffect (out . show) >>^ c
   , withEffect (out . show) >>^ value
   ]
 
-eventsExample : (AppSt, List (NS I [Button,Char,String]))
+eventsExample : (AppSt, List (HSum [Button,Char,String]))
 eventsExample = runState ini $ embed vs (events putStr)
-  where vs : List (NS I [MouseClick,Key,Input])
+  where vs : List (HSum [MouseClick,Key,Input])
         vs = [ inject $ MkKey 'C' True
              , inject $ MkInput "hello world"
              , inject $ MkMC 12 100 Rgt
@@ -317,7 +318,7 @@ reactive programming, we are going to need an input of
 time deltas for many operations. There are several ways
 to go about this: We could use MSFs pairing the
 current time delta with each input value:
-`MSF m (NP I [DTime,i]) o`. This gets cumbersome if
+`MSF m (HList [DTime,i]) o`. This gets cumbersome if
 we start nesting networks of signal functions and need
 to make sure the time deltas are passed on to all subsystems.
 We could also use some kind of reader monad, where asking

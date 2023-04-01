@@ -418,7 +418,7 @@ We therefore write our own combinator for this use case, taking
 into account what the input events tell us:
 
 ```idris
-fireAndHold : o -> MSF m (Event o) (NP I [o, Event o])
+fireAndHold : o -> MSF m (Event o) (HList [o, Event o])
 fireAndHold v = fan [hold v, id <|> once v]
 ```
 

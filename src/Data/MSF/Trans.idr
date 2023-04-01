@@ -8,7 +8,6 @@ import Control.Monad.Writer
 import Data.MSF.Core
 import Data.MSF.Util
 import Data.MSF.Running
-import Data.SOP
 
 --------------------------------------------------------------------------------
 --          General Morphisms
@@ -27,7 +26,7 @@ morphGS :  Monad m1
         -> MSF m1 i1 o1
         -> MSF m2 i2 o2
 morphGS f sf = feedback sf (arrM run >>^ \(o2,sf2) => [sf2,o2])
-  where run : NP I [MSF m1 i1 o1,i2] -> m2 (o2, MSF m1 i1 o1)
+  where run : HList [MSF m1 i1 o1,i2] -> m2 (o2, MSF m1 i1 o1)
         run [sf1,vi2] = f (step sf1) vi2
 
 ||| Applies a monad morphism to change the context of an MSF.
@@ -72,7 +71,7 @@ modify = arrM modify
 ||| Converts an outer `StateT` wrapper to an MSF converting
 ||| an additional argument of the state type.
 export
-fromState : Monad m => MSF (StateT s m) i o -> MSF m (NP I [s,i]) (NP I [s,o])
+fromState : Monad m => MSF (StateT s m) i o -> MSF m (HList [s,i]) (HList [s,o])
 fromState =
   morphGS (\f,[vs,vi] => (\(vs2,vo,vc) => ([vs2,vo],vc)) <$> runStateT vs (f vi))
 
@@ -92,7 +91,7 @@ fromState_ = morphGS (\f,vs => (\(vs2,_,vc) => (vs2,vc)) <$> runStateT vs (f ())
 ||| Converts a state transforming MSF to one with its monadic context
 ||| wrapped in `StateT s`.
 export
-toState : Monad m => MSF m (NP I [s,i]) (NP I [s,o]) -> MSF (StateT s m) i o
+toState : Monad m => MSF m (HList [s,i]) (HList [s,o]) -> MSF (StateT s m) i o
 toState =
   morphGS (\f,vi => ST $ \vs => (\([vs2,vo],vc) => (vs2,vo,vc)) <$> f [vs,vi])
 
@@ -113,7 +112,7 @@ ask = constM ask
 ||| Converts an outer `ReaderT` wrapper to an MSF taking an
 ||| an additional input.
 export
-fromReader : Monad m => MSF (ReaderT e m) i o -> MSF m (NP I [e,i]) o
+fromReader : Monad m => MSF (ReaderT e m) i o -> MSF m (HList [e,i]) o
 fromReader = morphGS (\f,[ve,vi] => runReaderT ve (f vi))
 
 ||| Converts the given MSF to use `env` as its environment.
@@ -131,7 +130,7 @@ fromReader_ = morphGS (\f,ve => runReaderT ve (f ()))
 ||| Converts an MSF taking an additional input
 ||| to one with its monadic context wrapped in `ReaderT e`.
 export
-toReader : Monad m => MSF m (NP I [e,i]) o -> MSF (ReaderT e m) i o
+toReader : Monad m => MSF m (HList [e,i]) o -> MSF (ReaderT e m) i o
 toReader = morphGS (\f,vi => MkReaderT $ \ve => f [ve,vi])
 
 ||| Like `toReader` but for MSFs without additional input
@@ -152,7 +151,7 @@ tell = arrM tell
 ||| Converts an outer `WriterT` wrapper to an MSF producing
 ||| an additional output.
 export
-fromWriter : Monoid w => Monad m => MSF (WriterT w m) i o -> MSF m i (NP I [w,o])
+fromWriter : Monoid w => Monad m => MSF (WriterT w m) i o -> MSF m i (HList [w,o])
 fromWriter =
   morphGS (\f,vi => (\((vo,vc),vw) => ([vw,vo],vc)) <$> runWriterT (f vi))
 
@@ -165,7 +164,7 @@ fromWriter_ =
 ||| Converts an MSF producing an additional output
 ||| to one with its monadic context wrapped in `WriterT w`.
 export
-toWriter : Monoid w => Monad m => MSF m i (NP I [w,o]) -> MSF (WriterT w m) i o
+toWriter : Monoid w => Monad m => MSF m i (HList [w,o]) -> MSF (WriterT w m) i o
 toWriter =
   morphGS (\f,vi =>
     MkWriterT $ \vw => (\([vw2,vo],vc) => ((vo,vc),vw <+> vw2)) <$> f vi)
