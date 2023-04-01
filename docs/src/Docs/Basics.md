@@ -395,5 +395,5 @@ testBallGame : List String
 testBallGame = embedI (replicate 10 ()) (ballGame (Id 1) $ MkBall 500 0)
 ```
 
-<!-- vi: filetype=idris2
+<!-- vi: filetype=idris2:syntax=markdown
 -->
