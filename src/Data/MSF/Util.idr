@@ -23,6 +23,7 @@
 module Data.MSF.Util
 
 import Data.List
+import Data.List.Elem
 import Data.MSF.Core
 import Data.MSF.Event
 import Data.SOP
@@ -247,10 +248,9 @@ cycle (h :: t) = unfold next (h :: t)
 --          Observing Streaming Functions
 --------------------------------------------------------------------------------
 
-||| Observe input values through the given MSF, discarding
-||| its output.
+||| Observe input values through the given sink.
 export
-observeWith : MSF m i o -> MSF m i i
+observeWith : MSF m i () -> MSF m i i
 observeWith sf = fan [id,sf] >>> hd
 
 ||| Run the given effectful computation on each input.
@@ -466,6 +466,21 @@ filter = arr . filter
 export
 mapMaybe : (i -> Maybe o) -> MSF m (Event i) (Event o)
 mapMaybe = arr . mapMaybe
+
+||| Sum projection: Fires an event if a value of the given type can
+||| be extracted from the input sum.
+export
+proj : (0 t : k) -> {auto prf : Elem t ks} -> MSF m (NS f ks) (Event $ f t)
+proj t = arr (\ns => maybeToEvent $ extract t ns)
+
+--------------------------------------------------------------------------------
+--          Observing Event Streams
+--------------------------------------------------------------------------------
+
+||| Observe an event throught the given sink.
+export %inline
+observeEvent : MSF m i () -> MSF m (Event i) (Event i)
+observeEvent = observeWith . ifEvent
 
 --------------------------------------------------------------------------------
 --          Accumulating Events
