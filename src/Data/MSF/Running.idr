@@ -186,7 +186,7 @@ reactimate_ ie mkMSF = do
 
   -- we need to register the correct event handler, otherwise
   -- nothing will run
-  writeIORef hRef handle
+  writeIORef hRef realHandler
 
   -- finally, fire the initial event (if any)
   traverse_ h.handle_ ie
