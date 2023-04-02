@@ -1,6 +1,7 @@
 module Data.MSF.Running
 
 import Control.Monad.Identity
+import Data.IORef
 import Data.MSF.Core
 
 %default total
@@ -75,7 +76,7 @@ step (Switch sf f) i = do
   step (f e) i
 
 --------------------------------------------------------------------------------
---          Running MSFs
+--          Testing MSFs
 --------------------------------------------------------------------------------
 
 ||| Uses the given MSF to process a list of input
@@ -122,3 +123,83 @@ size (Choice x)    = 1 + sizePar x
 size (Collect x)   = 1 + sizeCol x
 size (Loop x y)    = 1 + size y
 size (Switch x f)  = 1 + size x
+
+--------------------------------------------------------------------------------
+--          Handler
+--------------------------------------------------------------------------------
+
+||| An event handler typically used as an auto-implicit argument
+public export
+record Handler (m : Type -> Type) (e : Type) where
+  [noHints]
+  constructor H
+  handle_ : e -> m ()
+
+export %inline
+handle : {auto h : Handler m e} -> e -> m ()
+handle = h.handle_
+
+--------------------------------------------------------------------------------
+--          Running MSFs
+--------------------------------------------------------------------------------
+
+-- initialEvent: If `Just e`, evaluate the given `MSF` once with `e` to
+-- properly initialize all components.
+-- idPrefix: prefix for uniqe ids
+reactimate_ :
+     HasIO m
+  => (initialEvent : Maybe e)
+  -> (mkMSF        : Handler m e -> m (MSF m e (), m ()))
+  -> m (m ())
+reactimate_ ie mkMSF = do
+  -- Here we will put the proper event handler once everyting
+  -- is ready. This is not Haskell, so we can't define
+  -- the handler lazily and satisfy the totality checker at
+  -- the same time. We therefore initialize the mutable reference
+  -- with a dummy.
+  hRef    <- newIORef {a = e -> m ()} (const $ pure ())
+
+  -- our event handler
+  let h := H (\ve => readIORef hRef >>= \h => h ve)
+
+  (sf,cl) <- mkMSF h
+
+  -- the current application state consists of the current
+  -- monadic stream function, which will be stored in a
+  -- mutable ref
+  sfRef   <- newIORef sf
+
+  -- we can now implement the *real* event handler:
+  -- when an event is being fired, we evaluate the current
+  -- MSF and put the resulting continuation in the mutable ref
+  -- to be used when the next event occurs.
+  let realHandler : e -> m ()
+      realHandler = \ev => do
+        sf1      <- readIORef sfRef
+        (_, sf2) <- step sf1 ev
+        writeIORef sfRef sf2
+
+  -- we need to register the correct event handler, otherwise
+  -- nothing will run
+  writeIORef hRef handle
+
+  -- finally, fire the initial event (if any)
+  traverse_ h.handle_ ie
+
+  pure cl
+
+||| Create a monadic stream function (the reactive behavior
+||| of an UI, for instance)
+||| by passing the given generation function `sf` an event handler
+||| that can be registered at reactive components.
+||| The MSF will then be invoked and
+||| evaluated whenever an event is fired.
+export %inline
+reactimate : HasIO m => (Handler m e -> m (MSF m e (), m ())) -> m (m ())
+reactimate = reactimate_ Nothing
+
+||| Like `reactimate`, but evaluates the `MSF` once at the beginning by
+||| passing it the given initial event.
+export
+reactimateIni : HasIO m => e -> (Handler m e -> m (MSF m e (), m ())) -> m (m ())
+reactimateIni = reactimate_ . Just
