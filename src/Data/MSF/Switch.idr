@@ -12,7 +12,6 @@ import Data.MSF.Core
 import Data.MSF.Event
 import Data.MSF.Running
 import Data.MSF.Util
-import Data.SOP
 
 %default total
 
@@ -45,7 +44,7 @@ switchE = Switch
 ||| This uses `switchE` internally, so all restrictions mentioned
 ||| there apply.
 export
-switch :  MSF m i (NP I [o, Event e])
+switch :  MSF m i (HList [o, Event e])
        -> (e -> MSF m i o)
        -> MSF m i o
 switch sf = switchE $ sf >>^ (\[vo,ve] => event (Right vo) Left ve)
@@ -54,7 +53,7 @@ switch sf = switchE $ sf >>^ (\[vo,ve] => event (Right vo) Left ve)
 --          Delayed Switches
 --------------------------------------------------------------------------------
 
-rswUtil : NP I [o,Event x] -> Either (x,o) o
+rswUtil : HList [o,Event x] -> Either (x,o) o
 rswUtil [vo,Ev vx] = Left (vx,vo)
 rswUtil [vo,NoEv]  = Right vo
 
@@ -62,7 +61,7 @@ rswUtil [vo,NoEv]  = Right vo
 ||| in which case a new MSF is created,
 ||| which will be used in all further evaluation steps.
 export
-dSwitch : MSF m i (NP I [o, Event e]) -> (e -> MSF m i o) -> MSF m i o
+dSwitch : MSF m i (HList [o, Event e]) -> (e -> MSF m i o) -> MSF m i o
 dSwitch sf = switch (sf >>> par [id, iPre NoEv])
 
 --------------------------------------------------------------------------------
@@ -70,7 +69,7 @@ dSwitch sf = switch (sf >>> par [id, iPre NoEv])
 --------------------------------------------------------------------------------
 
 export %inline
-rSwitch : Monad m => MSF m i o -> MSF m (NP I [Event $ MSF m i o,i]) o
+rSwitch : Monad m => MSF m i o -> MSF m (HList [Event $ MSF m i o,i]) o
 rSwitch sf =
   feedback sf . arrM $
     \[sf,[ev,vi]] => do
@@ -78,7 +77,7 @@ rSwitch sf =
       pure [sf2,vo]
 
 export %inline
-drSwitch : Monad m => MSF m i o -> MSF m (NP I [Event $ MSF m i o,i]) o
+drSwitch : Monad m => MSF m i o -> MSF m (HList [Event $ MSF m i o,i]) o
 drSwitch sf =
   feedback sf . arrM $
     \[sf,[ev,vi]] => do

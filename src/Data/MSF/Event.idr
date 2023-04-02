@@ -1,6 +1,27 @@
 module Data.MSF.Event
 
+import public Data.List.Elem
+import public Data.List.Quantifiers
+
 %default total
+
+--------------------------------------------------------------------------------
+--          n-ary  sums
+--------------------------------------------------------------------------------
+
+public export
+0 HSum : List Type -> Type
+HSum = Any Prelude.id
+
+||| Wrap a value in an n-ary sum
+public export
+inject : Elem k ks => f k -> Any f ks
+inject @{Here}    x = Here x
+inject @{There _} x = There $ inject x
+
+--------------------------------------------------------------------------------
+--          Event
+--------------------------------------------------------------------------------
 
 ||| A data type isomorphic to `Maybe` used to signal
 ||| occurences of discrete events.
@@ -12,6 +33,13 @@ data Event : (a : Type) -> Type where
 --------------------------------------------------------------------------------
 --          Utilities
 --------------------------------------------------------------------------------
+
+||| Try to extract a value from an n-ary sum.
+public export
+project : (0 k : _) -> Elem k ks => Any f ks -> Event (f k)
+project _ @{Here}    (Here p)  = Ev p
+project v @{There _} (There p) = project v p
+project _            _         = NoEv
 
 public export
 maybeToEvent : Maybe a -> Event a
