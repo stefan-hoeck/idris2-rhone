@@ -1,6 +1,7 @@
 module Data.MSF.Running
 
 import Control.Monad.Identity
+import Data.Contravariant
 import Data.IORef
 import Data.MSF.Core
 
@@ -134,6 +135,10 @@ record Handler (m : Type -> Type) (e : Type) where
   [noHints]
   constructor H
   handle_ : e -> m ()
+
+public export
+Contravariant (Handler m) where
+  contramap f (H g) = H $ g . f
 
 export %inline
 handle : {auto h : Handler m e} -> e -> m ()
