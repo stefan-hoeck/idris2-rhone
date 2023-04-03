@@ -1,23 +1,9 @@
 module Data.MSF.Event
 
 import public Data.List.Elem
-import public Data.List.Quantifiers
+import public Data.List.Quantifiers.Extra
 
 %default total
-
---------------------------------------------------------------------------------
---          n-ary  sums
---------------------------------------------------------------------------------
-
-public export
-0 HSum : List Type -> Type
-HSum = Any Prelude.id
-
-||| Wrap a value in an n-ary sum
-public export
-inject : Elem k ks => f k -> Any f ks
-inject @{Here}    x = Here x
-inject @{There _} x = There $ inject x
 
 --------------------------------------------------------------------------------
 --          Event
