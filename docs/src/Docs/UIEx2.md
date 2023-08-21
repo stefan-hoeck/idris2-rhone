@@ -207,9 +207,10 @@ clear : MSF (State (List String)) i i
 clear = observeWith (const Nil >>> put)
 
 simulate : MSF (State (List String)) Ev () -> List Ev -> IO ()
-simulate sf es = traverse_ (putStrLn . printCommands)
-               $ evalState Nil
-               $ embed es (clear >>> sf >>> get)
+simulate sf es =
+    traverse_ (putStrLn . printCommands)
+  $ evalState Nil
+  $ embed es (clear >>> sf >>> get)
 ```
 
 ## First Try: Validating an MSF directly
@@ -219,15 +220,16 @@ all refinemend types are of the same structure, we can use
 a pretty general function for validating string input.
 
 ```idris
-validate :  {f : a -> Bool}
-         -> Cast String a
-         => (fld : Field)
-         -> (mk : (v : a) -> (0 prf : So (f v)) -> b)
-         -> String
-         -> Either Invalid b
+validate :
+     {f : a -> Bool}
+  -> {auto _ : Cast String a}
+  -> (fld : Field)
+  -> (mk : (v : a) -> (0 prf : So (f v)) -> b)
+  -> String
+  -> Either Invalid b
 validate fld mk s =
-  let va  = cast {to = a} s
-      msg = "Invalid \{print fld}: \{s}"
+  let va  := cast {to = a} s
+      msg := "Invalid \{print fld}: \{s}"
    in case choose (f va) of
         Left oh => Right $ mk va oh
         Right _ => Left $ if s == "" then InputRequired else Msg msg
@@ -239,17 +241,19 @@ include the new text content of the field in question, so
 we don't have to look this up in the UI first:
 
 ```idris
-input1 :  {f : a -> Bool}
-       -> MonadUI m
-       => Cast String a
-       => (fld : Field)
-       -> (mk : (v : a) -> (0 prf : So (f v)) -> b)
-       -> MSF m Ev (Maybe b)
-input1 fld mk =   inputFor fld
-              ^>> hold ""
-              >>> validate fld mk
-              ^>> withEffect (validity fld)
-              >>^ getRight
+input1 :
+     {f : a -> Bool}
+  -> {auto _ : MonadUI m}
+  -> {auto _ : Cast String a}
+  -> (fld : Field)
+  -> (mk : (v : a) -> (0 prf : So (f v)) -> b)
+  -> MSF m Ev (Maybe b)
+input1 fld mk =
+      inputFor fld
+  ^>> hold ""
+  >>> validate fld mk
+  ^>> withEffect (validity fld)
+  >>^ getRight
 ```
 
 Let's break this down a bit: `inputFor` produces a
@@ -269,11 +273,12 @@ can make use of the operators from `Control.Applicative.Syntax`.
 
 ```idris
 account1 : MonadUI m => MSF m Ev (Maybe Account)
-account1 =    MkAccount
-         <$$> input1 FAlias MkAlias
-         <**> input1 FName  MkName
-         <**> input1 FAge   MkAge
-         >>>  withEffect (enableSubmit . isJust)
+account1 =
+       MkAccount
+  <$$> input1 FAlias MkAlias
+  <**> input1 FName  MkName
+  <**> input1 FAge   MkAge
+  >>>  withEffect (enableSubmit . isJust)
 ```
 
 Finally, we need an MSF which sends a *submit* request
@@ -290,14 +295,16 @@ application controller:
 
 ```idris
 testMSF1 : IO ()
-testMSF1 = simulate (onSubmit account1)
-             [ Input FAge "10"
-             , Submit
-             , Input FName "Höck"
-             , Input FAge "40"
-             , Input FAlias "me"
-             , Submit
-             ]
+testMSF1 =
+  simulate
+    (onSubmit account1)
+    [ Input FAge "10"
+    , Submit
+    , Input FName "Höck"
+    , Input FAge "40"
+    , Input FAlias "me"
+    , Submit
+    ]
 ```
 
 And at the REPL:
@@ -334,34 +341,39 @@ a new string input, we make sure that no unnecessary work is being
 done:
 
 ```idris
-input2 :  {f : a -> Bool}
-       -> MonadUI m
-       => Cast String a
-       => (fld : Field)
-       -> (mk : (v : a) -> (0 prf : So (f v)) -> b)
-       -> MSF m Ev (Maybe b)
-input2 fld mk =   inputFor fld
-              ^>> map (validate fld mk)
-              ^>> withEffect (traverse_ $ validity fld)
-              >>> hold (Left InputRequired)
-              >>^ getRight
+input2 :
+     {f : a -> Bool}
+  -> {auto _ : MonadUI m}
+  -> {auto _ : Cast String a}
+  -> (fld : Field)
+  -> (mk : (v : a) -> (0 prf : So (f v)) -> b)
+  -> MSF m Ev (Maybe b)
+input2 fld mk =
+      inputFor fld
+  ^>> map (validate fld mk)
+  ^>> withEffect (traverse_ $ validity fld)
+  >>> hold (Left InputRequired)
+  >>^ getRight
 
 account2 : MonadUI m => MSF m Ev (Maybe Account)
-account2 =    MkAccount
-         <$$> input2 FAlias MkAlias
-         <**> input2 FName  MkName
-         <**> input2 FAge   MkAge
-         >>>  withEffect (enableSubmit . isJust)
+account2 =
+       MkAccount
+  <$$> input2 FAlias MkAlias
+  <**> input2 FName  MkName
+  <**> input2 FAge   MkAge
+  >>>  withEffect (enableSubmit . isJust)
 
 testMSF2 : IO ()
-testMSF2 = simulate (onSubmit account2)
-             [ Input FAge "10"
-             , Submit
-             , Input FName "Höck"
-             , Input FAge "40"
-             , Input FAlias "me"
-             , Submit
-             ]
+testMSF2 =
+  simulate
+    (onSubmit account2)
+    [ Input FAge "10"
+    , Submit
+    , Input FName "Höck"
+    , Input FAge "40"
+    , Input FAlias "me"
+    , Submit
+    ]
 ```
 
 And at the REPL:
@@ -433,19 +445,23 @@ validation info to the UI whenever the content of
 the text field in question changed:
 
 ```idris
-input :  {f : a -> Bool}
-      -> MonadUI m
-      => Cast String a
-      => (fld : Field)
-      -> (mk : (v : a) -> (0 prf : So (f v)) -> b)
-      -> MSF m Ev (Maybe b)
-input fld mk =   inputFor fld
-             ^>> map (validate fld mk)
-             ^>> fireAndHold (Left InputRequired)
-             >>> par [ arr getRight
-                     , withEffect (traverse_ $ validity fld)
-                     ]
-             >>> hd
+input :
+     {f : a -> Bool}
+  -> {auto _ : MonadUI m}
+  -> {auto _ : Cast String a}
+  -> (fld : Field)
+  -> (mk : (v : a) -> (0 prf : So (f v)) -> b)
+  -> MSF m Ev (Maybe b)
+input fld mk =
+      inputFor fld
+  ^>> map (validate fld mk)
+  ^>> fireAndHold (Left InputRequired)
+  >>>
+    par
+      [ arr getRight
+      , withEffect (traverse_ $ validity fld)
+      ]
+  >>> hd
 ```
 
 For enabling the *submit* button, we use `onChange` on
@@ -456,24 +472,27 @@ a whole:
 
 ```idris
 account : MonadUI m => MSF m Ev (Maybe Account)
-account =    MkAccount
-        <$$> input FAlias MkAlias
-        <**> input FName  MkName
-        <**> input FAge   MkAge
-        >>>  observeWith (isJust ^>> onChange ?>> arrM enableSubmit)
+account =
+       MkAccount
+  <$$> input FAlias MkAlias
+  <**> input FName  MkName
+  <**> input FAge   MkAge
+  >>>  observeWith (isJust ^>> onChange ?>> arrM enableSubmit)
 
 testMSF : IO ()
-testMSF = simulate (onSubmit account)
-            [ Submit
-            , Input FAge "10"
-            , Input FAge "10"
-            , Input FName ""
-            , Submit
-            , Input FName "Höck"
-            , Input FAge "40"
-            , Input FAlias "me"
-            , Submit
-            ]
+testMSF =
+  simulate
+    (onSubmit account)
+    [ Submit
+    , Input FAge "10"
+    , Input FAge "10"
+    , Input FName ""
+    , Submit
+    , Input FName "Höck"
+    , Input FAge "40"
+    , Input FAlias "me"
+    , Submit
+    ]
 ```
 
 And at the REPL:

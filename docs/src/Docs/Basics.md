@@ -206,10 +206,11 @@ toColor Mdl = "green"
 
 mouse : (log : String -> m ()) -> MSF m (HList [Int16,Int16,Button]) String
 mouse log =
-  par [ withEffect (\x => log "x: \{show x}") >>^ (*2)
-      , withEffect (\y => log "y: \{show y}") >>^ (+10)
-      , withEffect (log . show) >>^ toColor
-      ] >>^ (\[x,y,c] => "x: \{show x}, y: \{show y}, c: \{c}")
+  par
+    [ withEffect (\x => log "x: \{show x}") >>^ (*2)
+    , withEffect (\y => log "y: \{show y}") >>^ (+10)
+    , withEffect (log . show) >>^ toColor
+    ] >>^ (\[x,y,c] => "x: \{show x}, y: \{show y}, c: \{c}")
 
 runMouse : List (HList [Int16,Int16,Button]) -> (AppSt, List String)
 runMouse ps = runState ini $ embed ps (mouse putStr)
@@ -286,11 +287,13 @@ events out = choice
 
 eventsExample : (AppSt, List (HSum [Button,Char,String]))
 eventsExample = runState ini $ embed vs (events putStr)
-  where vs : List (HSum [MouseClick,Key,Input])
-        vs = [ inject $ MkKey 'C' True
-             , inject $ MkInput "hello world"
-             , inject $ MkMC 12 100 Rgt
-             ]
+  where
+    vs : List (HSum [MouseClick,Key,Input])
+    vs =
+      [ inject $ MkKey 'C' True
+      , inject $ MkInput "hello world"
+      , inject $ MkMC 12 100 Rgt
+      ]
 ```
 
 There are many additional predefined combinators for
@@ -349,8 +352,9 @@ is more convenient, to use `accumulateWith`:
 
 ```idris
 integral : (dt : m DTime) => MSF m Double Double
-integral =   fan [id, constM dt]
-         >>> accumulateWith (\[v,d],acc => acc + v * cast d) 0
+integral =
+      fan [id, constM dt]
+  >>> accumulateWith (\[v,d],acc => acc + v * cast d) 0
 ```
 
 With this we can simulate the movement (velocity
@@ -381,16 +385,18 @@ record Ball where
   vel : Velocity
 
 ball : m DTime => (ini : Ball) -> MSF m i Ball
-ball ini =   const g
-         >>> velocity ini.vel
-         >>> fan [position ini.pos, id]
-         >>> np MkBall
+ball ini =
+      const g
+  >>> velocity ini.vel
+  >>> fan [position ini.pos, id]
+  >>> np MkBall
 
 ballGame : m DTime -> (ini : Ball) -> MSF m i String
 ballGame dt ini = fan [time, ball ini] >>> np dispBall
-  where dispBall : Time -> Ball -> String
-        dispBall t (MkBall p v) =
-          "t: \{show t}; y: \{show p}; v: \{show v}"
+  where
+    dispBall : Time -> Ball -> String
+    dispBall t (MkBall p v) =
+      "t: \{show t}; y: \{show p}; v: \{show v}"
 
 testBallGame : List String
 testBallGame = embedI (replicate 10 ()) (ballGame (Id 1) $ MkBall 500 0)

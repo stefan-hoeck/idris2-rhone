@@ -44,9 +44,10 @@ switchE = Switch
 ||| This uses `switchE` internally, so all restrictions mentioned
 ||| there apply.
 export
-switch :  MSF m i (HList [o, Event e])
-       -> (e -> MSF m i o)
-       -> MSF m i o
+switch :
+     MSF m i (HList [o, Event e])
+  -> (e -> MSF m i o)
+  -> MSF m i o
 switch sf = switchE $ sf >>^ (\[vo,ve] => event (Right vo) Left ve)
 
 --------------------------------------------------------------------------------
@@ -88,9 +89,10 @@ drSwitch sf =
 ||| fires an event, in which case a new MSF is created,
 ||| which will be used in all futre evaluation cycles.
 export
-drswitchWhen :  Monad m
-             => MSF m i o
-             -> MSF m i (Event e)
-             -> (e -> MSF m i o)
-             -> MSF m i o
+drswitchWhen :
+     {auto _ : Monad m}
+  -> MSF m i o
+  -> MSF m i (Event e)
+  -> (e -> MSF m i o)
+  -> MSF m i o
 drswitchWhen ini es f = fan [es >>^ map f,id] >>> drSwitch ini

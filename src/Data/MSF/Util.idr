@@ -196,8 +196,10 @@ iPre v = feedback v swap
 export
 accumulateWith : (i -> o -> o) -> o -> MSF m i o
 accumulateWith f ini = feedback ini (arr g)
-  where g : HList [o,i] -> HList [o,o]
-        g [acc,inp] = let acc' = f inp acc in [acc',acc']
+
+  where
+    g : HList [o,i] -> HList [o,o]
+    g [acc,inp] = let acc' = f inp acc in [acc',acc']
 
 ||| Counts the number of scans of the signal function.
 export
@@ -237,9 +239,11 @@ repeatedly f = unfold $ \vo => let vo2 = f vo in [vo2,vo2]
 export
 cycle : (vs : List o) -> {auto 0 prf : NonEmpty vs} -> MSF m i o
 cycle (h :: t) = unfold next (h :: t)
-  where next : List o -> HList [List o, o]
-        next Nil        = [t,h]
-        next (h' :: t') = [t',h']
+
+  where
+    next : List o -> HList [List o, o]
+    next Nil        = [t,h]
+    next (h' :: t') = [t',h']
 
 --------------------------------------------------------------------------------
 --          Observing Streaming Functions
@@ -280,9 +284,11 @@ hold = accumulateWith (\ev,v => fromEvent v ev)
 export
 ntimes : Nat -> o -> MSF m i (Event o)
 ntimes n vo = Switch (feedback n $ arr next) (const never)
-  where next : HList [Nat,i] -> HList [Nat,Either () (Event o)]
-        next [0,_]   = [0, Left ()]
-        next [S k,_] = [k, Right $ Ev vo]
+
+  where
+    next : HList [Nat,i] -> HList [Nat,Either () (Event o)]
+    next [0,_]   = [0, Left ()]
+    next [S k,_] = [k, Right $ Ev vo]
 
 ||| Fire the given event exactly once on the first
 ||| evaluation step.
@@ -361,10 +367,12 @@ ifNoEvent sf = event >>> collect [const neutral, sf]
 export
 onChange : Eq i => MSF m i (Event i)
 onChange = mealy accum  NoEv
-  where accum : i -> Event i -> HList [Event i, Event i]
-        accum v old =
-          let ev = Ev v
-           in if ev == old then [ev,NoEv] else [ev,ev]
+
+  where
+    accum : i -> Event i -> HList [Event i, Event i]
+    accum v old =
+      let ev = Ev v
+       in if ev == old then [ev,NoEv] else [ev,ev]
 
 ||| Fires the first input as an event whenever the
 ||| second input fires.
@@ -410,10 +418,11 @@ justOnEvent = arr $ \case [Just va,e] => e $> va
 ||| event streams fire. Uses the given function
 ||| to combine simultaneously occuring events.
 export
-unionWith : (o -> o -> o)
-          -> MSF m i (Event o)
-          -> MSF m i (Event o)
-          -> MSF m i (Event o)
+unionWith :
+     (o -> o -> o)
+  -> MSF m i (Event o)
+  -> MSF m i (Event o)
+  -> MSF m i (Event o)
 unionWith = elementwise2 . unionWith
 
 ||| Left-biased union of event streams.
@@ -438,10 +447,11 @@ unionR = elementwise2 unionR
 |||
 ||| This is an alias for `(<+>)`.
 export %inline
-union :  Semigroup o
-      => MSF m i (Event o)
-      -> MSF m i (Event o)
-      -> MSF m i (Event o)
+union :
+     {auto _ : Semigroup o}
+  -> MSF m i (Event o)
+  -> MSF m i (Event o)
+  -> MSF m i (Event o)
 union = (<+>)
 
 export
@@ -489,9 +499,11 @@ observeEvent = observeWith . ifEvent
 export
 accumulateWithE : (i -> o -> o) -> o -> MSF m (Event i) (Event o)
 accumulateWithE f ini = feedback ini (arr g)
-  where g : HList [o,Event i] -> HList [o,Event o]
-        g [acc,NoEv]  = [acc,NoEv]
-        g [acc,Ev vi] = let acc' = f vi acc in [acc',Ev acc']
+
+  where
+    g : HList [o,Event i] -> HList [o,Event o]
+    g [acc,NoEv]  = [acc,NoEv]
+    g [acc,Ev vi] = let acc' = f vi acc in [acc',Ev acc']
 
 ||| Count the number of occurences of an event
 export

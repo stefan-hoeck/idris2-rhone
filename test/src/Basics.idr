@@ -71,12 +71,14 @@ prop_idOrOnce = property $ do
 
 export
 props : Group
-props = MkGroup "basic properties"
-          [ ("prop_const", prop_const)
-          , ("prop_arrId", prop_arrId)
-          , ("prop_arr", prop_arr)
-          , ("prop_elementwise", prop_elementwise)
-          , ("prop_elementwise2", prop_elementwise2)
-          , ("prop_once", prop_once)
-          , ("idOrOnce", prop_idOrOnce)
-          ]
+props =
+  MkGroup
+    "basic properties"
+    [ ("prop_const", prop_const)
+    , ("prop_arrId", prop_arrId)
+    , ("prop_arr", prop_arr)
+    , ("prop_elementwise", prop_elementwise)
+    , ("prop_elementwise2", prop_elementwise2)
+    , ("prop_once", prop_once)
+    , ("idOrOnce", prop_idOrOnce)
+    ]

@@ -34,8 +34,10 @@ Acceleration = Double
 
 integralFrom : (v0 : Double) -> SF Double Double
 integralFrom v0 = fan [id, iPre v0, ask] >>> accumulateWith next 0
-  where next : NP I [Double,Double,DTime] -> Double -> Double
-        next [new,old,dt] acc = acc + (dt / 2 * (new + old))
+
+  where
+    next : NP I [Double,Double,DTime] -> Double -> Double
+    next [new,old,dt] acc = acc + (dt / 2 * (new + old))
 
 acc : Acceleration
 acc = -9.81

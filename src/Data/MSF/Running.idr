@@ -152,8 +152,8 @@ handle = h.handle_
 -- properly initialize all components.
 -- idPrefix: prefix for uniqe ids
 reactimate_ :
-     HasIO m
-  => (initialEvent : Maybe e)
+     {auto _ : HasIO m}
+  -> (initialEvent : Maybe e)
   -> (mkMSF        : Handler m e -> m (MSF m e (), m ()))
   -> m (m ())
 reactimate_ ie mkMSF = do
