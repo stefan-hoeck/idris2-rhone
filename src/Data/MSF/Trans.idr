@@ -21,10 +21,11 @@ import Data.MSF.Running
 ||| For examples of usage, have a look at the implementations of
 ||| functions like `unreader`, `reader`, `unstate`, and similar.
 export
-morphGS :  Monad m1
-        => (forall c . (i1 -> m1(o1,c)) -> i2 -> m2(o2,c))
-        -> MSF m1 i1 o1
-        -> MSF m2 i2 o2
+morphGS :
+     {auto _ : Monad m1}
+  -> (forall c . (i1 -> m1(o1,c)) -> i2 -> m2(o2,c))
+  -> MSF m1 i1 o1
+  -> MSF m2 i2 o2
 morphGS f sf = feedback sf (arrM run >>^ \(o2,sf2) => [sf2,o2])
   where run : HList [MSF m1 i1 o1,i2] -> m2 (o2, MSF m1 i1 o1)
         run [sf1,vi2] = f (step sf1) vi2

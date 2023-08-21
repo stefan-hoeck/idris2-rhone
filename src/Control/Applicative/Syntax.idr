@@ -9,13 +9,15 @@ map2 : Functor f => Functor g => (a -> b) -> (f . g) a -> (f . g) b
 map2 = map . map
 
 public export
-map3 :  Functor f => Functor g => Functor h
-     => (a -> b) -> (f . g . h) a -> (f . g . h) b
+map3 :
+  Functor f => Functor g => Functor h =>
+  (a -> b) -> (f . g . h) a -> (f . g . h) b
 map3 = map . map . map
 
 public export
-map4 :  Functor f => Functor g => Functor h => Functor i
-     => (a -> b) -> (f . g . h . i) a -> (f . g . h . i) b
+map4 :
+  Functor f => Functor g => Functor h => Functor i =>
+  (a -> b) -> (f . g . h . i) a -> (f . g . h . i) b
 map4 = map . map . map . map
 
 infixr 4 <$$>, <$$$>, <$$$$>
@@ -41,13 +43,15 @@ public export
 x <**> y = [| x <*> y |]
 
 public export
-(<***>) :  Applicative f => Applicative g => Applicative h
-        => (f . g . h) (a -> b) -> (f . g . h) a -> (f . g . h) b
+(<***>) :
+  Applicative f => Applicative g => Applicative h =>
+  (f . g . h) (a -> b) -> (f . g . h) a -> (f . g . h) b
 x <***> y = [| x <**> y |]
 
 public export
-(<****>) :  Applicative f => Applicative g => Applicative h => Applicative i
-         => (f . g . h . i) (a -> b) -> (f . g . h . i) a -> (f . g . h . i) b
+(<****>) :
+  Applicative f => Applicative g => Applicative h => Applicative i =>
+  (f . g . h . i) (a -> b) -> (f . g . h . i) a -> (f . g . h . i) b
 x <****> y = [| x <***> y |]
 
 --------------------------------------------------------------------------------

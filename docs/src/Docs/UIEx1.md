@@ -43,12 +43,14 @@ Ev : Type
 Ev = Int8 -> Int8
 
 msf : MonadUI m => MSF m Ev ()
-msf = accumulateWith apply 0 >>>
-      fan_ [ arrM dispCount
-           , (>= 10)    ^>> arrM disableInc
-           , (<= (-10)) ^>> arrM disableDec
-           , (== 0)     ^>> arrM disableReset
-           ]
+msf =
+  accumulateWith apply 0 >>>
+  fan_
+    [ arrM dispCount
+    , (>= 10)    ^>> arrM disableInc
+    , (<= (-10)) ^>> arrM disableDec
+    , (== 0)     ^>> arrM disableReset
+    ]
 ```
 
 As you can see, accumulating the state is only a small
@@ -104,15 +106,17 @@ purposes:
 ```idris
 onInput : MSF (State UI) Input (HSum [Ev,Input])
 onInput = fan [get, id] >>> bool valid >>> choice [arr toFun, snd]
-  where valid : HList [UI,Input] -> Bool
-        valid [ui,Inc]   = ui.inc
-        valid [ui,Dec]   = ui.dec
-        valid [ui,Reset] = ui.reset
 
-        toFun : HList [UI,Input] -> Int8 -> Int8
-        toFun [_,Inc  ] = (+  1)
-        toFun [_,Dec  ] = (+ -1)
-        toFun [_,Reset] = const 0
+  where
+    valid : HList [UI,Input] -> Bool
+    valid [ui,Inc]   = ui.inc
+    valid [ui,Dec]   = ui.dec
+    valid [ui,Reset] = ui.reset
+
+    toFun : HList [UI,Input] -> Int8 -> Int8
+    toFun [_,Inc  ] = (+  1)
+    toFun [_,Dec  ] = (+ -1)
+    toFun [_,Reset] = const 0
 ```
 
 Finally, putting everything together, we run a simulation
@@ -123,16 +127,20 @@ MSF, and a dummy string if the action was invalid:
 
 ```idris
 simulate : List Input -> List String
-simulate evs = evalState ini . embed evs
-             $ onInput >>> collect
-                 [ msf >>> get >>^ show
-                 , arr $ \i => "Ignored invalid input: \{show i}"
-                 ]
+simulate evs =
+  evalState ini . embed evs $
+    onInput >>>
+    collect
+      [ msf >>> get >>^ show
+      , arr $ \i => "Ignored invalid input: \{show i}"
+      ]
 
 testUI : List String
-testUI = simulate $  replicate 11 Inc
-                  ++ replicate 2 Reset
-                  ++ replicate 11 Dec
+testUI =
+  simulate $
+       replicate 11 Inc
+    ++ replicate 2 Reset
+    ++ replicate 11 Dec
 ```
 
 And at the REPL:
