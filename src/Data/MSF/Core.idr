@@ -144,7 +144,7 @@ constM = Lifted . const
 --          Sequencing MSFs
 --------------------------------------------------------------------------------
 
-infixr 1 >>>
+export infixr 1 >>>
 
 ||| Sequencing of MSFs
 export %inline

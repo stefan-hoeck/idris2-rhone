@@ -29,7 +29,7 @@ import Data.MSF.Core
 --          Sequencing Utilities
 --------------------------------------------------------------------------------
 
-infixr 1 ^>>, >>^, >>!, !>>, ?>>, >>-, ^>-, !>-, ?>-
+export infixr 1 ^>>, >>^, >>!, !>>, ?>>, >>-, ^>-, !>-, ?>-
 
 ||| Sequencing of an MSF and a pure function
 export %inline
