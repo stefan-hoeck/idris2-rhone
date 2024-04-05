@@ -20,8 +20,8 @@ map4 :
   (a -> b) -> (f . g . h . i) a -> (f . g . h . i) b
 map4 = map . map . map . map
 
-infixr 4 <$$>, <$$$>, <$$$$>
-infixl 3 <**>, <***>, <****>
+export infixr 4 <$$>, <$$$>, <$$$$>
+export infixl 3 <**>, <***>, <****>
 
 public export
 (<$$>) : Functor f => Functor g => (a -> b) -> (f . g) a -> (f . g) b

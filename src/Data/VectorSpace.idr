@@ -2,10 +2,10 @@ module Data.VectorSpace
 
 import Data.Vect
 
-infixr 9 *^
-infixl 9 ^/
-infixl 6 ^+^, ^-^
-infix 7 `dot`
+export infixr 9 *^
+export infixl 9 ^/
+export infixl 6 ^+^, ^-^
+export infix 7 `dot`
 
 public export
 interface VectorSpace v where
